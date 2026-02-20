@@ -1,0 +1,53 @@
+  </main>
+  <%- include('modal') %>
+  <script src="/modal.js"></script>
+  <footer class="site-footer">
+    <div class="footer-inner">UPGS Perf – Lighthouse performance scans</div>
+  </footer>
+  <a href="#top" id="back-to-top" class="back-to-top" aria-label="Back to top" hidden>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-arrow-up"/></svg>
+  </a>
+  <script>
+    (function () {
+      var backToTop = document.getElementById('back-to-top');
+      if (!backToTop) return;
+      var scrollThreshold = 400;
+      function updateVisibility() {
+        if (window.scrollY >= scrollThreshold) backToTop.removeAttribute('hidden');
+        else backToTop.setAttribute('hidden', '');
+      }
+      window.addEventListener('scroll', updateVisibility, { passive: true });
+      updateVisibility();
+    })();
+  </script>
+  <script>
+    (function () {
+      var userMenu = document.querySelector('.user-menu');
+      if (!userMenu) return;
+      var trigger = userMenu.querySelector('.user-menu__trigger');
+      var panel = userMenu.querySelector('.user-menu__panel');
+      function open() {
+        userMenu.setAttribute('data-open', 'true');
+        trigger.setAttribute('aria-expanded', 'true');
+        panel.removeAttribute('hidden');
+      }
+      function close() {
+        userMenu.removeAttribute('data-open');
+        trigger.setAttribute('aria-expanded', 'false');
+        panel.setAttribute('hidden', '');
+      }
+      trigger.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (userMenu.getAttribute('data-open') === 'true') close();
+        else open();
+      });
+      userMenu.querySelectorAll('.user-menu__item, .user-menu__form button').forEach(function (el) {
+        el.addEventListener('click', function () { close(); });
+      });
+      document.addEventListener('click', function (e) {
+        if (!userMenu.contains(e.target)) close();
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,231 @@
+<%- include('partials/header') %>
+  <div class="landing">
+    <div id="guest-scan-overlay" class="scan-overlay" role="dialog" aria-modal="true" aria-labelledby="guest-scan-overlay-title" aria-describedby="guest-scan-overlay-hint" aria-busy="true" hidden>
+      <div class="scan-overlay__panel">
+        <div class="scan-overlay__icon" aria-hidden="true">
+          <svg class="icon" aria-hidden="true"><use href="#icon-gauge"/></svg>
+        </div>
+        <div class="scan-overlay__spinner-wrap">
+          <div class="spinner scan-overlay__spinner" aria-hidden="true"></div>
+        </div>
+        <h2 id="guest-scan-overlay-title" class="scan-overlay__title">Free scan in progress</h2>
+        <p id="guest-scan-overlay-url" class="scan-overlay__url" aria-hidden="true"></p>
+        <p id="guest-scan-overlay-device" class="scan-overlay__device" aria-hidden="true"></p>
+        <p class="scan-overlay__text">Running Lighthouse audit…</p>
+        <p id="guest-scan-overlay-step" class="scan-overlay__step" aria-live="polite">Starting…</p>
+        <p id="guest-scan-overlay-hint" class="scan-overlay__hint">This may take 30–60 seconds</p>
+        <div class="scan-overlay__progress" aria-hidden="true"></div>
+        <p class="scan-overlay__stay">Please don’t close this page</p>
+      </div>
+    </div>
+
+    <section class="landing-hero">
+      <div class="landing-hero__inner">
+        <span class="landing-hero__icon-wrap" aria-hidden="true">
+          <svg class="icon landing-hero__icon" aria-hidden="true"><use href="#icon-lightning"/></svg>
+        </span>
+        <h1 class="landing-hero__title">Lighthouse performance, simplified</h1>
+        <p class="landing-hero__subtitle">Run audits on any URL, track scores over time, and get clear recommendations. Mobile and desktop in one place.</p>
+        <div class="landing-hero__cta">
+          <a href="/register" class="btn btn--primary btn--lg"><svg class="icon" aria-hidden="true"><use href="#icon-run"/></svg> Get started</a>
+          <a href="/login" class="btn btn--ghost btn--lg">Log in</a>
+        </div>
+        <p class="landing-hero__meta">Powered by Google Lighthouse</p>
+      </div>
+    </section>
+
+    <section class="landing-try" aria-labelledby="landing-try-heading">
+      <div class="landing-try__inner">
+        <h2 id="landing-try-heading" class="landing-section-title">Try 2 free scans — no account needed</h2>
+        <p class="landing-try__text">Enter a URL and run a Lighthouse audit. You’ll see scores and a sample of recommendations. Create an account for export, screenshots, history, and more.</p>
+        <% if (typeof guestError !== 'undefined' && guestError) { %>
+          <div class="landing-try__error" role="alert">
+            <% if (guestError === 'invalid_url') { %>Please enter a valid http or https URL.<% } %>
+            <% if (guestError === 'limit_reached') { %>You’ve used your 2 free scans. Create an account to run more.<% } %>
+            <% if (guestError === 'scan_failed') { %>The scan failed. Check the URL and try again, or create an account to use the full app.<% } %>
+            <% if (guestError === 'session') { %>Something went wrong. Please try again.<% } %>
+          </div>
+        <% } %>
+        <% if (typeof guestScansUsed !== 'undefined' && guestScansUsed >= (typeof guestScansLimit !== 'undefined' ? guestScansLimit : 2)) { %>
+          <div class="landing-try__limit">
+            <p class="landing-try__limit-text">You’ve used your 2 free scans.</p>
+            <a href="/register" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#icon-user"/></svg> Create account for unlimited scans</a>
+          </div>
+        <% } else { %>
+          <form action="/guest/scan" method="post" class="landing-try__form">
+            <div class="landing-try__url-row">
+              <label for="guest-url" class="visually-hidden">URL to scan</label>
+              <input type="url" id="guest-url" name="url" class="landing-try__input" placeholder="https://example.com" required>
+            </div>
+            <div class="landing-try__options">
+              <fieldset class="landing-try__devices">
+                <legend class="landing-try__devices-legend">Device</legend>
+                <label class="landing-try__checkbox"><input type="checkbox" name="formFactor" value="mobile" checked> Mobile</label>
+                <label class="landing-try__checkbox"><input type="checkbox" name="formFactor" value="desktop"> Desktop</label>
+              </fieldset>
+              <button type="submit" class="btn btn--primary landing-try__submit" id="guest-scan-submit">
+                <svg class="icon" aria-hidden="true"><use href="#icon-run"/></svg> Run free scan
+              </button>
+            </div>
+            <% if (typeof guestScansUsed !== 'undefined' && guestScansUsed > 0) { %>
+              <p class="landing-try__count">Free scan <%= guestScansUsed %> of <%= typeof guestScansLimit !== 'undefined' ? guestScansLimit : 2 %> used</p>
+            <% } %>
+          </form>
+          <div id="guest-scan-error" class="landing-try__error" role="alert" hidden></div>
+        <% } %>
+      </div>
+    </section>
+
+    <section class="landing-features" aria-labelledby="landing-features-heading">
+      <div class="landing-features__inner">
+        <h2 id="landing-features-heading" class="landing-section-title">What you get</h2>
+        <ul class="landing-features__grid">
+          <li class="landing-feature">
+            <span class="landing-feature__icon landing-feature__icon--run" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#icon-run"/></svg></span>
+            <h3 class="landing-feature__title">One-click scans</h3>
+            <p class="landing-feature__text">Enter a URL, pick mobile or desktop (or both), and run a full Lighthouse audit in under a minute.</p>
+          </li>
+          <li class="landing-feature">
+            <span class="landing-feature__icon landing-feature__icon--gauge" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#icon-gauge"/></svg></span>
+            <h3 class="landing-feature__title">Scores at a glance</h3>
+            <p class="landing-feature__text">Performance, accessibility, best practices, and SEO—with clear scores and “needs attention” items on every report.</p>
+          </li>
+          <li class="landing-feature">
+            <span class="landing-feature__icon landing-feature__icon--chart" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#icon-gauge"/></svg></span>
+            <h3 class="landing-feature__title">Trends over time</h3>
+            <p class="landing-feature__text">See how a site’s scores evolve across scans with simple charts. Spot regressions and track improvements.</p>
+          </li>
+          <li class="landing-feature">
+            <span class="landing-feature__icon landing-feature__icon--export" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#icon-download"/></svg></span>
+            <h3 class="landing-feature__title">Screenshots &amp; export</h3>
+            <p class="landing-feature__text">Full-page screenshots per run, PDF and JSON export, and shareable read-only links for reports.</p>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="landing-showcase" aria-labelledby="landing-showcase-heading">
+      <div class="landing-showcase__inner">
+        <h2 id="landing-showcase-heading" class="landing-section-title">See it in action</h2>
+        <div class="landing-showcase__grid">
+          <div class="landing-showcase__item">
+            <div class="landing-showcase__frame">
+              <span class="landing-showcase__placeholder" aria-hidden="true">
+                <svg class="icon" aria-hidden="true"><use href="#icon-lightning"/></svg>
+                <span>Dashboard</span>
+              </span>
+            </div>
+            <p class="landing-showcase__caption">Run new scans and see recent results at a glance</p>
+          </div>
+          <div class="landing-showcase__item">
+            <div class="landing-showcase__frame">
+              <span class="landing-showcase__placeholder" aria-hidden="true">
+                <svg class="icon" aria-hidden="true"><use href="#icon-gauge"/></svg>
+                <span>Report</span>
+              </span>
+            </div>
+            <p class="landing-showcase__caption">Scores, screenshot, and actionable recommendations</p>
+          </div>
+          <div class="landing-showcase__item">
+            <div class="landing-showcase__frame">
+              <span class="landing-showcase__placeholder" aria-hidden="true">
+                <svg class="icon" aria-hidden="true"><use href="#icon-list"/></svg>
+                <span>History &amp; Trends</span>
+              </span>
+            </div>
+            <p class="landing-showcase__caption">Browse scan history and track score evolution over time</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="landing-cta">
+      <div class="landing-cta__inner">
+        <h2 class="landing-cta__title">Ready to improve your scores?</h2>
+        <p class="landing-cta__text">Create a free account and run your first Lighthouse scan in under a minute.</p>
+        <a href="/register" class="btn btn--primary btn--lg"><svg class="icon" aria-hidden="true"><use href="#icon-user"/></svg> Create account</a>
+      </div>
+    </section>
+  </div>
+  <script>
+    (function () {
+      var form = document.querySelector('.landing-try__form');
+      var overlay = document.getElementById('guest-scan-overlay');
+      var errorEl = document.getElementById('guest-scan-error');
+      var urlEl = document.getElementById('guest-scan-overlay-url');
+      var deviceEl = document.getElementById('guest-scan-overlay-device');
+      var stepEl = document.getElementById('guest-scan-overlay-step');
+      var SCAN_STEPS = ['Loading page…', 'Running Lighthouse audit…', 'Analyzing performance…', 'Capturing screenshot…', 'Almost done…'];
+      function startStepRotation(stepEl, ms) {
+        if (!stepEl) return function () {};
+        var idx = 0;
+        stepEl.textContent = SCAN_STEPS[0];
+        var t = setInterval(function () {
+          idx = (idx + 1) % SCAN_STEPS.length;
+          stepEl.textContent = SCAN_STEPS[idx];
+        }, ms || 7000);
+        return function () { clearInterval(t); };
+      }
+      if (!form || !overlay) return;
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (errorEl) {
+          errorEl.setAttribute('hidden', '');
+          errorEl.textContent = '';
+        }
+        var urlInput = form.querySelector('[name="url"]');
+        var checked = form.querySelectorAll('[name="formFactor"]:checked');
+        if (urlEl) {
+          urlEl.textContent = urlInput && urlInput.value ? urlInput.value.trim() : '';
+          if (urlEl.textContent) urlEl.removeAttribute('aria-hidden'); else urlEl.setAttribute('aria-hidden', 'true');
+        }
+        if (deviceEl) {
+          var labels = [];
+          checked.forEach(function (cb) { labels.push(cb.value === 'desktop' ? 'Desktop' : 'Mobile'); });
+          deviceEl.textContent = labels.join(' & ');
+          if (deviceEl.textContent) deviceEl.removeAttribute('aria-hidden'); else deviceEl.setAttribute('aria-hidden', 'true');
+        }
+        var stopSteps = startStepRotation(stepEl, 7000);
+        overlay.removeAttribute('hidden');
+        var params = new URLSearchParams();
+        if (urlInput) params.append('url', urlInput.value);
+        checked.forEach(function (cb) { params.append('formFactor', cb.value); });
+        fetch(form.action, {
+          method: 'POST',
+          body: params.toString(),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+          credentials: 'same-origin'
+        })
+          .then(function (r) {
+            return r.json().then(function (data) {
+              stopSteps();
+              if (r.ok && data && data.redirect) {
+                setTimeout(function () { window.location = data.redirect; }, 100);
+                return;
+              }
+              overlay.setAttribute('hidden', '');
+              var msg = (data && data.error === 'invalid_url') ? 'Please enter a valid http or https URL.'
+                : (data && data.error === 'limit_reached') ? 'You\'ve used your 2 free scans. Create an account to run more.'
+                : (data && data.error === 'scan_failed') ? 'The scan failed. Check the URL and try again.'
+                : (data && data.error === 'session') ? 'Something went wrong. Please try again.'
+                : 'Something went wrong. Please try again.';
+              if (errorEl) {
+                errorEl.textContent = msg;
+                errorEl.removeAttribute('hidden');
+                errorEl.focus();
+              }
+            });
+          })
+          .catch(function () {
+            stopSteps();
+            overlay.setAttribute('hidden', '');
+            if (errorEl) {
+              errorEl.textContent = 'The scan failed or the connection was lost. Please try again.';
+              errorEl.removeAttribute('hidden');
+              errorEl.focus();
+            }
+          });
+      });
+    })();
+  </script>
+<%- include('partials/footer') %>

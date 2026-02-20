@@ -1,0 +1,11 @@
+<% if (typeof scanGroups !== 'undefined' && scanGroups && scanGroups.length > 0) {
+  scanGroups.forEach(function(group) {
+    var scans = group;
+%><%- include('dashboard-scan-row', { scans: scans }) %><% });
+} else { %>
+<tr class="dashboard-recent__row dashboard-recent__row--empty">
+  <td colspan="6" class="dashboard-recent__cell dashboard-recent__cell--empty">
+    <%= typeof searchQuery !== 'undefined' && searchQuery ? 'No scans match your search.' : 'No scans yet.' %>
+  </td>
+</tr>
+<% } %>

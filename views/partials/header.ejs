@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title : 'UPGS Perf' %></title>
+  <link rel="stylesheet" href="/styles.css">
+  <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><meta name="csrf-token" content="<%= csrfToken %>"><% } %>
+</head>
+<body id="top">
+  <%- include('icons') %>
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="<%= typeof email !== 'undefined' && email ? '/dashboard' : '/' %>" class="logo">
+        <svg class="icon icon--logo" aria-hidden="true"><use href="#icon-lightning"/></svg>
+        UPGS Perf
+      </a>
+      <% if (typeof email !== 'undefined' && email) { %>
+        <nav class="nav">
+          <a href="/dashboard" class="nav-link nav-link--text">Dashboard</a>
+          <a href="/scans" class="nav-link nav-link--text">History</a>
+          <a href="/trends" class="nav-link nav-link--text">Trends</a>
+          <div class="user-menu">
+            <button type="button" class="user-menu__trigger" aria-expanded="false" aria-haspopup="true" aria-label="Account menu">
+              <svg class="icon icon--sm" aria-hidden="true"><use href="#icon-user"/></svg>
+              <span class="user-menu__name"><%= typeof userName !== 'undefined' && userName ? userName : email %></span>
+              <svg class="icon icon--sm user-menu__chevron" aria-hidden="true"><use href="#icon-chevron-down"/></svg>
+            </button>
+            <div class="user-menu__panel" role="menu" hidden>
+              <a href="/settings" class="user-menu__item" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-settings"/></svg> Settings</a>
+              <form action="/logout" method="post" class="user-menu__form" role="none">
+                <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+                <button type="submit" class="user-menu__item user-menu__item--danger" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-logout"/></svg> Log out</button>
+              </form>
+            </div>
+          </div>
+        </nav>
+      <% } else { %>
+        <nav class="nav">
+          <a href="/login" class="nav-link"><svg class="icon" aria-hidden="true"><use href="#icon-login"/></svg> Log in</a>
+          <a href="/register" class="btn btn--primary"><svg class="icon" aria-hidden="true"><use href="#icon-user"/></svg> Register</a>
+        </nav>
+      <% } %>
+    </div>
+  </header>
+  <main class="main">

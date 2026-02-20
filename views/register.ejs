@@ -1,0 +1,49 @@
+<%- include('partials/header') %>
+  <div class="page page--center auth-page">
+    <div class="auth-card">
+      <div class="auth-card__brand">
+        <svg class="icon auth-card__icon" aria-hidden="true"><use href="#icon-gauge"/></svg>
+        <h1 class="auth-card__title">Create account</h1>
+        <p class="auth-card__subtitle">Get started with Lighthouse performance scans</p>
+      </div>
+      <% if (typeof message !== 'undefined' && message) { %>
+        <div class="auth-message" role="status">
+          <svg class="icon auth-message__icon" aria-hidden="true"><use href="#icon-check"/></svg>
+          <span><%= message %></span>
+        </div>
+      <% } %>
+      <% if (typeof error !== 'undefined' && error) { %>
+        <div class="auth-error" role="alert">
+          <svg class="icon auth-error__icon" aria-hidden="true"><use href="#icon-alert"/></svg>
+          <span><%= error %></span>
+        </div>
+      <% } %>
+      <form action="/register" method="post" class="auth-form">
+        <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+        <div class="form-row">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autocomplete="email" maxlength="254" placeholder="you@example.com">
+        </div>
+        <div class="form-row">
+          <label for="name">Name <span class="form-row__optional">(optional)</span></label>
+          <input type="text" id="name" name="name" autocomplete="name" maxlength="200" placeholder="Your name">
+        </div>
+        <div class="form-row">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required autocomplete="new-password" minlength="8" maxlength="256" placeholder="••••••••">
+          <span class="form-row__hint">At least 8 characters</span>
+        </div>
+        <div class="form-row">
+          <label for="confirm_password">Confirm password</label>
+          <input type="password" id="confirm_password" name="confirm_password" required autocomplete="new-password" minlength="8" maxlength="256" placeholder="••••••••">
+        </div>
+        <button type="submit" class="btn btn--primary btn--block auth-form__submit">
+          <svg class="icon" aria-hidden="true"><use href="#icon-user"/></svg> Create account
+        </button>
+      </form>
+      <p class="auth-card__footer">
+        Already have an account? <a href="/login" class="auth-card__link">Log in</a>
+      </p>
+    </div>
+  </div>
+<%- include('partials/footer') %>

@@ -1,0 +1,263 @@
+<% if (typeof data !== 'undefined' && data.summary && data.summary.metrics) { %>
+  <%
+    var metrics = data.summary.metrics;
+    var timelineDefs = [
+      { id: 'first-contentful-paint', label: 'FCP' },
+      { id: 'largest-contentful-paint', label: 'LCP' },
+      { id: 'speed-index', label: 'Speed Index' },
+      { id: 'interactive', label: 'TTI' }
+    ];
+    var timelineMetrics = [];
+    for (var i = 0; i < timelineDefs.length; i++) {
+      var def = timelineDefs[i];
+      var m = metrics[def.id];
+      if (m && typeof m.value === 'number' && m.value >= 0) {
+        timelineMetrics.push({
+          id: def.id,
+          label: def.label,
+          value: m.value,
+          displayValue: m.displayValue || String(m.value)
+        });
+      }
+    }
+    var maxTime = 2000;
+    for (var j = 0; j < timelineMetrics.length; j++) {
+      if (timelineMetrics[j].value > maxTime) maxTime = timelineMetrics[j].value;
+    }
+    var maxTicks = 10;
+    var rawInterval = maxTime / maxTicks;
+    var nice = [200, 500, 1000, 2000, 5000, 10000, 15000, 20000, 30000, 60000];
+    var tickInterval = 60000;
+    for (var n = 0; n < nice.length; n++) {
+      if (nice[n] >= rawInterval) { tickInterval = nice[n]; break; }
+    }
+    if (rawInterval > 60000) tickInterval = Math.ceil(rawInterval / 10000) * 10000;
+    var ticks = [];
+    for (var t = 0; t <= maxTime; t += tickInterval) {
+      ticks.push(t);
+    }
+    if (ticks[ticks.length - 1] !== maxTime) ticks.push(maxTime);
+  %>
+  <% if (timelineMetrics.length > 0) { %>
+  <section class="card report-speed-viz" aria-labelledby="report-speed-viz-title">
+    <h2 id="report-speed-viz-title" class="report-speed-viz__title card-title">Speed visualization</h2>
+    <% if (typeof filmstripUrl !== 'undefined' && filmstripUrl) { %>
+    <div class="report-speed-viz__filmstrip" id="report-speed-viz-filmstrip-<%= typeof data.id !== 'undefined' ? data.id : 'single' %>" data-filmstrip-url="<%= filmstripUrl %>" data-form-factor="<%= (data.options && data.options.formFactor) === 'desktop' ? 'desktop' : 'mobile' %>" data-chrome-version="<%= (data.summary && data.summary.chromeVersion) ? data.summary.chromeVersion : '' %>" data-metrics="<%= encodeURIComponent(JSON.stringify(timelineMetrics)) %>">
+      <div class="report-speed-viz__filmstrip-head">
+        <span class="report-speed-viz__filmstrip-label">Page load<span class="report-speed-viz__filmstrip-chrome" id="filmstrip-chrome-<%= typeof data.id !== 'undefined' ? data.id : 'single' %>" data-initial-version="<%= (data.summary && data.summary.chromeVersion) ? data.summary.chromeVersion : '' %>"><%= (data.summary && data.summary.chromeVersion) ? ' Chrome ' + data.summary.chromeVersion : '' %></span></span>
+        <button type="button" class="report-speed-viz__filmstrip-expand" aria-label="View load video larger" title="View larger" hidden>View larger</button>
+      </div>
+      <button type="button" class="report-speed-viz__filmstrip-viewport report-speed-viz__filmstrip-viewport-btn" aria-label="View load video larger">
+        <img class="report-speed-viz__filmstrip-frame" src="" alt="Page load progress" hidden>
+        <div class="report-speed-viz__filmstrip-placeholder" aria-hidden="true">Loading…</div>
+      </button>
+      <div class="report-speed-viz__filmstrip-progress-wrap" role="group" aria-label="Playback progress">
+        <div class="report-speed-viz__filmstrip-progress" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0 seconds" aria-label="Seek">
+          <div class="report-speed-viz__filmstrip-progress-track"></div>
+          <div class="report-speed-viz__filmstrip-progress-fill"></div>
+        </div>
+      </div>
+      <div class="report-speed-viz__filmstrip-controls">
+        <button type="button" class="report-speed-viz__filmstrip-btn report-speed-viz__filmstrip-btn--play" aria-label="Play load video" title="Play">Play</button>
+        <span class="report-speed-viz__filmstrip-time" aria-live="polite">0.0s / 0.0s</span>
+        <label class="report-speed-viz__filmstrip-loop">
+          <input type="checkbox" class="report-speed-viz__filmstrip-loop-input" aria-label="Loop playback">
+          <span class="report-speed-viz__filmstrip-loop-label">Loop</span>
+        </label>
+      </div>
+    </div>
+    <% } %>
+    <p class="report-speed-viz__intro">When key loading metrics occurred during the run (0 to <%= (maxTime / 1000).toFixed(1) %>s).</p>
+    <div class="report-speed-viz__timeline">
+      <div class="report-speed-viz__axis" role="img" aria-label="Timeline from 0 to <%= (maxTime / 1000).toFixed(1) %> seconds with metric markers">
+        <% for (var k = 0; k < ticks.length; k++) { %>
+          <span class="report-speed-viz__tick" style="left: <%= (ticks[k] / maxTime * 100) %>%;"><%= (ticks[k] / 1000).toFixed(ticks[k] >= 1000 ? 1 : 0) %>s</span>
+        <% } %>
+      </div>
+      <div class="report-speed-viz__track"></div>
+      <% timelineMetrics.forEach(function(m) {
+        var pct = (m.value / maxTime) * 100;
+        if (pct < 1) pct = 1;
+        if (pct > 99) pct = 99;
+      %>
+        <div class="report-speed-viz__marker report-speed-viz__marker--<%= m.id %>" style="left: <%= pct %>%;" role="listitem">
+          <span class="report-speed-viz__marker-line" aria-hidden="true"></span>
+          <span class="report-speed-viz__marker-label"><%= m.label %> <%= m.displayValue %></span>
+        </div>
+      <% }); %>
+    </div>
+    <script>
+(function () {
+  var containers = document.querySelectorAll('.report-speed-viz__filmstrip[data-filmstrip-url]:not([data-filmstrip-inited])');
+  containers.forEach(function (el) {
+    el.setAttribute('data-filmstrip-inited', '1');
+    var url = el.getAttribute('data-filmstrip-url');
+    var frameImg = el.querySelector('.report-speed-viz__filmstrip-frame');
+    var placeholder = el.querySelector('.report-speed-viz__filmstrip-placeholder');
+    var btn = el.querySelector('.report-speed-viz__filmstrip-btn--play');
+    var timeEl = el.querySelector('.report-speed-viz__filmstrip-time');
+    var progressEl = el.querySelector('.report-speed-viz__filmstrip-progress');
+    var progressFill = el.querySelector('.report-speed-viz__filmstrip-progress-fill');
+    var loopInput = el.querySelector('.report-speed-viz__filmstrip-loop-input');
+    var expandBtn = el.querySelector('.report-speed-viz__filmstrip-expand');
+    var viewportBtn = el.querySelector('.report-speed-viz__filmstrip-viewport-btn');
+    var chromeLabel = el.querySelector('.report-speed-viz__filmstrip-chrome');
+    if (!frameImg || !btn || !timeEl) return;
+    var frames = [];
+    var currentIndex = 0;
+    var playing = false;
+    var startTime = 0;
+    var rafId = null;
+    function getTotalMs() { return frames.length ? frames[frames.length - 1].timing : 0; }
+    function updateProgressUI() {
+      var total = getTotalMs();
+      var current = frames.length ? frames[currentIndex].timing : 0;
+      var pct = total > 0 ? (current / total) * 100 : 0;
+      if (timeEl) {
+        timeEl.textContent = (current / 1000).toFixed(1) + 's / ' + (total / 1000).toFixed(1) + 's';
+      }
+      if (progressFill) progressFill.style.width = pct + '%';
+      if (progressEl) {
+        progressEl.setAttribute('aria-valuenow', Math.round(current));
+        progressEl.setAttribute('aria-valuemax', total);
+        progressEl.setAttribute('aria-valuetext', (current / 1000).toFixed(1) + ' seconds');
+      }
+    }
+    function showFrame(index) {
+      if (index < 0 || index >= frames.length) return;
+      currentIndex = index;
+      var f = frames[index];
+      frameImg.src = f.data;
+      frameImg.removeAttribute('hidden');
+      if (placeholder) placeholder.setAttribute('hidden', '');
+      btn.setAttribute('aria-label', playing ? 'Pause load video' : 'Play load video');
+      btn.textContent = playing ? 'Pause' : 'Play';
+      updateProgressUI();
+    }
+    function tick() {
+      if (!playing || frames.length === 0) return;
+      var elapsed = (Date.now() - startTime);
+      var nextIndex = 0;
+      for (var i = frames.length - 1; i >= 0; i--) {
+        if (frames[i].timing <= elapsed) { nextIndex = i; break; }
+      }
+      showFrame(nextIndex);
+      if (nextIndex >= frames.length - 1) {
+        playing = false;
+        if (loopInput && loopInput.checked) {
+          currentIndex = 0;
+          startTime = Date.now();
+          playing = true;
+          showFrame(0);
+          rafId = requestAnimationFrame(tick);
+        } else {
+          btn.textContent = 'Play';
+          btn.setAttribute('aria-label', 'Play load video');
+          return;
+        }
+      } else {
+        rafId = requestAnimationFrame(tick);
+      }
+    }
+    function play() {
+      if (frames.length === 0) return;
+      playing = true;
+      startTime = Date.now() - (currentIndex > 0 ? frames[currentIndex].timing : 0);
+      btn.textContent = 'Pause';
+      btn.setAttribute('aria-label', 'Pause load video');
+      tick();
+    }
+    function pause() {
+      playing = false;
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = null;
+      btn.textContent = 'Play';
+      btn.setAttribute('aria-label', 'Play load video');
+    }
+    function seekToTime(ms) {
+      var total = getTotalMs();
+      if (total <= 0) return;
+      var idx = 0;
+      for (var i = 0; i < frames.length; i++) {
+        if (frames[i].timing <= ms) idx = i;
+      }
+      if (playing) {
+        startTime = Date.now() - frames[idx].timing;
+      }
+      showFrame(idx);
+    }
+    btn.addEventListener('click', function () {
+      if (playing) pause(); else play();
+    });
+    if (progressEl) {
+      progressEl.addEventListener('click', function (e) {
+        if (frames.length === 0) return;
+        var rect = progressEl.getBoundingClientRect();
+        var total = getTotalMs();
+        var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        seekToTime(pct * total);
+      });
+      progressEl.addEventListener('keydown', function (e) {
+        if (frames.length === 0) return;
+        var total = getTotalMs();
+        var step = total / 20;
+        if (e.key === 'ArrowLeft' || e.key === 'Home') {
+          e.preventDefault();
+          seekToTime(e.key === 'Home' ? 0 : Math.max(0, frames[currentIndex].timing - step));
+        } else if (e.key === 'ArrowRight' || e.key === 'End') {
+          e.preventDefault();
+          seekToTime(e.key === 'End' ? total : Math.min(total, frames[currentIndex].timing + step));
+        }
+      });
+    }
+    function openOverlay() {
+      if (frames.length > 0 && typeof window.openFilmstripOverlay === 'function') {
+        var formFactor = el.getAttribute('data-form-factor') || 'mobile';
+        var chromeVersion = el.getAttribute('data-chrome-version') || '';
+        var metricsJson = el.getAttribute('data-metrics');
+        var metrics = [];
+        try {
+          if (metricsJson) metrics = JSON.parse(decodeURIComponent(metricsJson));
+        } catch (e) {}
+        window.openFilmstripOverlay(frames, formFactor, chromeVersion, metrics);
+      }
+    }
+    if (expandBtn) {
+      expandBtn.addEventListener('click', function (e) { e.preventDefault(); openOverlay(); });
+    }
+    if (viewportBtn) {
+      viewportBtn.addEventListener('click', function (e) {
+        if (frames.length > 0) { e.preventDefault(); openOverlay(); }
+      });
+    }
+    function setChromeVersion(version) {
+      if (!version) return;
+      el.setAttribute('data-chrome-version', version);
+      if (chromeLabel) {
+        chromeLabel.textContent = ' Chrome ' + version;
+      }
+    }
+    var initialChrome = chromeLabel ? chromeLabel.getAttribute('data-initial-version') : '';
+    if (initialChrome) setChromeVersion(initialChrome);
+    fetch(url)
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (data) {
+        frames = data.frames || [];
+        el.filmstripFrames = frames;
+        if (data.chromeVersion) setChromeVersion(data.chromeVersion);
+        if (frames.length > 0) {
+          showFrame(0);
+          if (expandBtn && document.getElementById('filmstrip-overlay')) expandBtn.removeAttribute('hidden');
+        } else if (placeholder) {
+          placeholder.textContent = 'No frames';
+        }
+      })
+      .catch(function () {
+        if (placeholder) placeholder.textContent = 'Load video unavailable';
+      });
+  });
+})();
+    </script>
+  </section>
+  <% } %>
+<% } %>

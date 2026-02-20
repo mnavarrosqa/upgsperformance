@@ -1,0 +1,462 @@
+<%- include('partials/header') %>
+  <div class="page dashboard">
+    <div id="scan-overlay" class="scan-overlay" role="dialog" aria-modal="true" aria-labelledby="scan-overlay-title" aria-describedby="scan-overlay-hint" aria-busy="true" hidden>
+      <div class="scan-overlay__panel">
+        <div class="scan-overlay__icon" aria-hidden="true">
+          <svg class="icon" aria-hidden="true"><use href="#icon-gauge"/></svg>
+        </div>
+        <div class="scan-overlay__spinner-wrap">
+          <div class="spinner scan-overlay__spinner" aria-hidden="true"></div>
+        </div>
+        <h2 id="scan-overlay-title" class="scan-overlay__title">Scan in progress</h2>
+        <p id="scan-overlay-url" class="scan-overlay__url" aria-hidden="true"></p>
+        <p id="scan-overlay-device" class="scan-overlay__device" aria-hidden="true"></p>
+        <p id="scan-overlay-text" class="scan-overlay__text">Running Lighthouse scan…</p>
+        <p id="scan-overlay-step" class="scan-overlay__step" aria-live="polite">Starting…</p>
+        <p id="scan-overlay-hint" class="scan-overlay__hint">This may take 30–60 seconds</p>
+        <div class="scan-overlay__progress" aria-hidden="true"></div>
+        <p class="scan-overlay__stay">Please don’t close this window</p>
+      </div>
+    </div>
+    <div id="rescan-overlay" class="scan-overlay" role="dialog" aria-modal="true" aria-labelledby="rescan-overlay-title" aria-describedby="rescan-overlay-desc" aria-busy="true" hidden>
+      <div class="scan-overlay__panel">
+        <div class="scan-overlay__icon" aria-hidden="true">
+          <svg class="icon" aria-hidden="true"><use href="#icon-gauge"/></svg>
+        </div>
+        <div class="scan-overlay__spinner-wrap">
+          <div class="spinner scan-overlay__spinner" aria-hidden="true"></div>
+        </div>
+        <h2 id="rescan-overlay-title" class="scan-overlay__title">Re-scan in progress</h2>
+        <p id="rescan-overlay-url" class="scan-overlay__url" aria-hidden="true"></p>
+        <p id="rescan-overlay-device" class="scan-overlay__device" aria-hidden="true"></p>
+        <p class="scan-overlay__text">Re-running Lighthouse scan…</p>
+        <p id="rescan-overlay-step" class="scan-overlay__step" aria-live="polite">Starting…</p>
+        <p id="rescan-overlay-desc" class="scan-overlay__hint">This may take 30–60 seconds</p>
+        <div class="scan-overlay__progress" aria-hidden="true"></div>
+        <p class="scan-overlay__stay">Please don’t close this window</p>
+      </div>
+    </div>
+
+    <header class="dashboard-hero">
+      <h1 class="dashboard-hero__title"><svg class="icon dashboard-hero__icon" aria-hidden="true"><use href="#icon-lightning"/></svg> Performance dashboard</h1>
+      <p class="dashboard-hero__subtitle">Run Lighthouse scans and track results for any URL.</p>
+    </header>
+
+    <div class="dashboard__grid">
+    <section class="card dashboard-scan">
+      <h2 class="dashboard-scan__title">New scan</h2>
+      <% if (typeof error !== 'undefined' && error) { %>
+        <p class="error dashboard-scan__error"><%= error %></p>
+      <% } %>
+      <form action="/scans" method="post" class="scan-form dashboard-scan__form" id="scan-form">
+        <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+        <div class="dashboard-scan__url-row">
+          <label for="url" class="dashboard-scan__url-label">URL</label>
+          <div class="dashboard-scan__url-wrap">
+            <span class="dashboard-scan__url-icon" aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#icon-globe"/></svg></span>
+            <input type="url" id="url" name="url" class="dashboard-scan__url-input" placeholder="https://example.com" required>
+          </div>
+        </div>
+        <div class="dashboard-scan__options-row">
+          <fieldset class="dashboard-scan__device">
+            <legend class="dashboard-scan__device-legend">Device</legend>
+            <div class="dashboard-scan__checkboxes">
+              <label class="dashboard-scan__checkbox-label">
+                <input type="checkbox" name="formFactor" value="mobile" class="dashboard-scan__checkbox">
+                <span>Mobile</span>
+              </label>
+              <label class="dashboard-scan__checkbox-label">
+                <input type="checkbox" name="formFactor" value="desktop" class="dashboard-scan__checkbox">
+                <span>Desktop</span>
+              </label>
+            </div>
+          </fieldset>
+          <button type="submit" class="btn btn--primary btn--block dashboard-scan__submit" id="scan-submit">
+            <svg class="icon" aria-hidden="true"><use href="#icon-run"/></svg> Run scan
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card dashboard-recent">
+      <div class="dashboard-recent__toolbar">
+        <h2 class="dashboard-recent__title">Recent scans</h2>
+        <div class="dashboard-recent__actions">
+          <form action="/scans" method="get" class="dashboard-search" role="search" id="dashboard-search-form">
+            <label for="dashboard-search-input" class="visually-hidden">Search scans by URL</label>
+            <input type="search" id="dashboard-search-input" name="q" class="dashboard-search__input" placeholder="Search scans…" aria-label="Search scans by URL" value="" autocomplete="off">
+            <a href="/scans" id="dashboard-search-view-all" class="btn btn--ghost btn--sm dashboard-search__submit"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-search"/></svg> View all</a>
+          </form>
+        </div>
+      </div>
+      <% if (scanGroups && scanGroups.length) { %>
+        <div class="dashboard-recent__table-wrap" data-bulk-redirect="dashboard">
+          <div class="bulk-actions bulk-actions--hidden" id="dashboard-bulk-actions" role="region" aria-live="polite">
+            <span class="bulk-actions__count"><span id="dashboard-bulk-count">0</span> selected</span>
+            <button type="button" class="btn btn--danger btn--sm bulk-actions__delete" id="dashboard-bulk-delete">Delete selected</button>
+          </div>
+          <table class="dashboard-recent__table">
+            <thead>
+              <tr>
+                <th class="dashboard-recent__th dashboard-recent__th--select" scope="col">
+                  <label class="bulk-select-all"><input type="checkbox" class="bulk-select-all__input" id="dashboard-select-all" aria-label="Select all rows"><span class="bulk-select-all__label" aria-hidden="true">Select</span></label>
+                </th>
+                <th class="dashboard-recent__th dashboard-recent__th--url">URL</th>
+                <th class="dashboard-recent__th dashboard-recent__th--scores">Scores</th>
+                <th class="dashboard-recent__th dashboard-recent__th--device">Device</th>
+                <th class="dashboard-recent__th dashboard-recent__th--date">Date &amp; time</th>
+                <th class="dashboard-recent__th dashboard-recent__th--actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="dashboard-tbody">
+              <%- include('partials/dashboard-tbody', { scanGroups: scanGroups || [], searchQuery: typeof searchQuery !== 'undefined' ? searchQuery : undefined }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="dashboard-empty">
+          <svg class="dashboard-empty__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-gauge"/></svg>
+          <p class="dashboard-empty__text">No scans yet</p>
+          <p class="dashboard-empty__hint">Enter a URL in the form above and run your first Lighthouse scan.</p>
+        </div>
+      <% } %>
+      <% if (typeof pagination !== 'undefined' && pagination) { %>
+        <%- include('partials/pagination', { baseUrl: '/dashboard', pagination: pagination }) %>
+      <% } %>
+    </section>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var form = document.getElementById('scan-form');
+      var overlay = document.getElementById('scan-overlay');
+      var overlayText = document.getElementById('scan-overlay-text');
+      var overlayHint = document.getElementById('scan-overlay-hint');
+      var submitBtn = document.getElementById('scan-submit');
+      var scanOverlayUrl = document.getElementById('scan-overlay-url');
+      var scanOverlayDevice = document.getElementById('scan-overlay-device');
+      var scanOverlayStep = document.getElementById('scan-overlay-step');
+      var SCAN_STEPS = ['Loading page…', 'Running Lighthouse audit…', 'Analyzing performance…', 'Capturing screenshot…', 'Almost done…'];
+      function startScanStepRotation(stepEl, ms) {
+        if (!stepEl) return function () {};
+        var idx = 0;
+        stepEl.textContent = SCAN_STEPS[0];
+        var t = setInterval(function () {
+          idx = (idx + 1) % SCAN_STEPS.length;
+          stepEl.textContent = SCAN_STEPS[idx];
+        }, ms || 7000);
+        return function () { clearInterval(t); };
+      }
+      if (form && overlay && submitBtn) {
+        form.addEventListener('submit', function (e) {
+          var checked = form.querySelectorAll('.dashboard-scan__checkbox:checked');
+          if (checked.length === 0) {
+            e.preventDefault();
+            if (window.showAlert) window.showAlert('Select at least one device (Mobile and/or Desktop).');
+            return;
+          }
+          var urlInput = form.querySelector('#url');
+          if (scanOverlayUrl) {
+            scanOverlayUrl.textContent = urlInput && urlInput.value ? urlInput.value.trim() : '';
+            if (scanOverlayUrl.textContent) scanOverlayUrl.removeAttribute('aria-hidden'); else scanOverlayUrl.setAttribute('aria-hidden', 'true');
+          }
+          if (scanOverlayDevice) {
+            var labels = [];
+            checked.forEach(function (cb) { labels.push(cb.value === 'desktop' ? 'Desktop' : 'Mobile'); });
+            scanOverlayDevice.textContent = labels.join(' & ');
+            scanOverlayDevice.removeAttribute('aria-hidden');
+          }
+          if (scanOverlayStep) startScanStepRotation(scanOverlayStep, 7000);
+          if (overlayText && overlayHint && checked.length === 2) {
+            overlayText.textContent = 'Running 2 Lighthouse scans…';
+            overlayHint.textContent = 'This may take 1–2 minutes';
+          }
+          overlay.removeAttribute('hidden');
+          submitBtn.disabled = true;
+        });
+      }
+
+      var wrap = document.querySelector('.dashboard-recent__table-wrap[data-bulk-redirect="dashboard"]');
+      var tbody = document.getElementById('dashboard-tbody');
+      var searchInput = document.getElementById('dashboard-search-input');
+      var viewAllLink = document.getElementById('dashboard-search-view-all');
+      var rescanOverlay = document.getElementById('rescan-overlay');
+
+      function updateViewAllHref() {
+        if (!viewAllLink) return;
+        var q = searchInput ? searchInput.value.trim() : '';
+        viewAllLink.href = q ? '/scans?q=' + encodeURIComponent(q) : '/scans';
+      }
+      if (searchInput && viewAllLink) {
+        searchInput.addEventListener('input', updateViewAllHref);
+      }
+
+      var searchDebounceTimer;
+      function runLiveSearch() {
+        if (!tbody || !searchInput) return;
+        var q = searchInput.value.trim();
+        var url = '/scans/table-rows?q=' + encodeURIComponent(q);
+        fetch(url)
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            tbody.innerHTML = html;
+            updateBulkBar();
+            if (document.getElementById('dashboard-select-all')) {
+              document.getElementById('dashboard-select-all').checked = false;
+              document.getElementById('dashboard-select-all').indeterminate = false;
+            }
+          })
+          .catch(function () {});
+      }
+      if (searchInput && tbody) {
+        searchInput.addEventListener('input', function () {
+          clearTimeout(searchDebounceTimer);
+          searchDebounceTimer = setTimeout(runLiveSearch, 280);
+        });
+      }
+
+      function getSelectedIds() {
+        if (!wrap) return [];
+        var rowCheckboxes = wrap.querySelectorAll('.bulk-row-select__input');
+        var ids = [];
+        rowCheckboxes.forEach(function (cb) {
+          if (cb.checked && cb.value) ids.push.apply(ids, cb.value.split(','));
+        });
+        return ids;
+      }
+      function updateBulkBar() {
+        if (!wrap) return;
+        var selectAll = document.getElementById('dashboard-select-all');
+        var bulkBar = document.getElementById('dashboard-bulk-actions');
+        var bulkCount = document.getElementById('dashboard-bulk-count');
+        var rowCheckboxes = wrap.querySelectorAll('.bulk-row-select__input');
+        var ids = getSelectedIds();
+        var n = ids.length;
+        if (bulkCount) bulkCount.textContent = n;
+        if (bulkBar) {
+          if (n > 0) { bulkBar.classList.remove('bulk-actions--hidden'); bulkBar.classList.add('bulk-actions--visible'); }
+          else { bulkBar.classList.add('bulk-actions--hidden'); bulkBar.classList.remove('bulk-actions--visible'); }
+        }
+        if (selectAll) {
+          selectAll.checked = n > 0 && n === rowCheckboxes.length;
+          selectAll.indeterminate = n > 0 && n < rowCheckboxes.length;
+        }
+      }
+
+      if (wrap) {
+        wrap.addEventListener('change', function (e) {
+          if (e.target.matches('.bulk-row-select__input')) updateBulkBar();
+        });
+      }
+
+      var selectAllEl = document.getElementById('dashboard-select-all');
+      if (selectAllEl) {
+        selectAllEl.addEventListener('change', function () {
+          if (!wrap) return;
+          var rowCheckboxes = wrap.querySelectorAll('.bulk-row-select__input');
+          rowCheckboxes.forEach(function (cb) { cb.checked = selectAllEl.checked; });
+          updateBulkBar();
+        });
+      }
+
+      var bulkDeleteBtn = document.getElementById('dashboard-bulk-delete');
+      if (bulkDeleteBtn) {
+        bulkDeleteBtn.addEventListener('click', function () {
+          var ids = getSelectedIds();
+          if (ids.length === 0) return;
+          var msg = ids.length === 1 ? 'Delete this scan? This cannot be undone.' : 'Delete ' + ids.length + ' selected scan(s)? This cannot be undone.';
+          if (!window.showConfirm) { submitBulkDelete(ids); return; }
+          window.showConfirm(msg, { title: 'Delete scan(s)', okLabel: 'Delete', danger: true }).then(function (ok) {
+            if (ok) submitBulkDelete(ids);
+          });
+        });
+      }
+      function submitBulkDelete(ids) {
+        var form = document.createElement('form');
+        form.method = 'post';
+        form.action = '/scans/delete-batch';
+        var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta && csrfMeta.getAttribute('content')) {
+          var inputCsrf = document.createElement('input');
+          inputCsrf.type = 'hidden';
+          inputCsrf.name = '_csrf';
+          inputCsrf.value = csrfMeta.getAttribute('content');
+          form.appendChild(inputCsrf);
+        }
+        var inputRedirect = document.createElement('input');
+        inputRedirect.type = 'hidden';
+        inputRedirect.name = 'redirect';
+        inputRedirect.value = 'dashboard';
+        form.appendChild(inputRedirect);
+        ids.forEach(function (id) {
+          var input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'ids';
+          input.value = id;
+          form.appendChild(input);
+        });
+        document.body.appendChild(form);
+        form.submit();
+      }
+
+      var rescanOverlayUrl = document.getElementById('rescan-overlay-url');
+      var rescanOverlayDevice = document.getElementById('rescan-overlay-device');
+      var rescanOverlayStep = document.getElementById('rescan-overlay-step');
+      function startRescanStepRotation(stepEl, ms) {
+        if (!stepEl) return function () {};
+        var idx = 0;
+        stepEl.textContent = SCAN_STEPS[0];
+        var t = setInterval(function () {
+          idx = (idx + 1) % SCAN_STEPS.length;
+          stepEl.textContent = SCAN_STEPS[idx];
+        }, ms || 7000);
+        return function () { clearInterval(t); };
+      }
+      if (wrap) {
+        wrap.addEventListener('click', function (e) {
+          var btn = e.target.closest && e.target.closest('.scan-list__rescan');
+          if (!btn || !rescanOverlay) return;
+          e.preventDefault();
+          var singleUrl = btn.getAttribute('data-rescan-url');
+          var desktopUrl = btn.getAttribute('data-rescan-desktop-url');
+          var mobileUrl = btn.getAttribute('data-rescan-mobile-url');
+          var runId = btn.getAttribute('data-rescan-run-id');
+          function showRescanOverlay() {
+            if (rescanOverlayUrl) {
+              rescanOverlayUrl.textContent = btn.getAttribute('data-rescan-display-url') || '';
+              if (rescanOverlayUrl.textContent) rescanOverlayUrl.removeAttribute('aria-hidden'); else rescanOverlayUrl.setAttribute('aria-hidden', 'true');
+            }
+            if (rescanOverlayDevice) {
+              rescanOverlayDevice.textContent = btn.getAttribute('data-rescan-device') || '';
+              if (rescanOverlayDevice.textContent) rescanOverlayDevice.removeAttribute('aria-hidden'); else rescanOverlayDevice.setAttribute('aria-hidden', 'true');
+            }
+            return startRescanStepRotation(rescanOverlayStep, 7000);
+          }
+          function doRescan(url) {
+            var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            var csrf = csrfMeta ? csrfMeta.getAttribute('content') : '';
+            return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' }, body: csrf ? new URLSearchParams({ _csrf: csrf }).toString() : '' })
+              .then(function (r) {
+                if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'Rescan failed'); }).catch(function () { throw new Error('Rescan failed. Try again.'); });
+                return r.json();
+              });
+          }
+          function runRescan(choice) {
+            var stopSteps = showRescanOverlay();
+            rescanOverlay.removeAttribute('hidden');
+            btn.disabled = true;
+            function hideOverlay() {
+              stopSteps();
+              rescanOverlay.setAttribute('hidden', '');
+              btn.disabled = false;
+            }
+            if (choice === 'both' && runId) {
+              var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+              var csrf = csrfMeta ? csrfMeta.getAttribute('content') : '';
+              fetch('/scans/rescan-both', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ run_id: runId, _csrf: csrf }) })
+                .then(function (r) {
+                  if (!r.ok) return r.json().then(function (d) { throw new Error(d.error || 'Rescan failed'); }).catch(function () { throw new Error('Rescan failed. Try again.'); });
+                  return r.json();
+                })
+                .then(function (data) {
+                  if (data && data.redirect) window.location = data.redirect;
+                  else hideOverlay();
+                })
+                .catch(function (err) {
+                  hideOverlay();
+                  if (window.showAlert) window.showAlert(err.message || 'Rescan failed. Try again.');
+                });
+              return;
+            }
+            var urls = [];
+            if (choice === 'single' && singleUrl) urls = [singleUrl];
+            else if (choice === 'both' && desktopUrl && mobileUrl) urls = [desktopUrl, mobileUrl];
+            else if (choice === 'desktop' && desktopUrl) urls = [desktopUrl];
+            else if (choice === 'mobile' && mobileUrl) urls = [mobileUrl];
+            if (urls.length === 0) { hideOverlay(); return; }
+            var chain = urls.reduce(function (acc, u) { return acc.then(function () { return doRescan(u); }); }, Promise.resolve());
+            chain.then(function (data) {
+              if (data && data.redirect) window.location = data.redirect;
+              else if (urls.length > 1) window.location = '/scans';
+              else hideOverlay();
+            }).catch(function (err) {
+              hideOverlay();
+              if (window.showAlert) window.showAlert(err.message || 'Rescan failed. Try again.');
+            });
+          }
+          if (desktopUrl && mobileUrl && window.showChoice) {
+            window.showChoice('This URL was scanned on Desktop and Mobile. Re-scan both or choose one device?', 'Re-scan', [
+              { label: 'Re-scan both', value: 'both', primary: true },
+              { label: 'Desktop only', value: 'desktop', primary: false },
+              { label: 'Mobile only', value: 'mobile', primary: false }
+            ]).then(function (choice) { if (choice) runRescan(choice); });
+          } else if (singleUrl) runRescan('single');
+          else if (desktopUrl) runRescan('desktop');
+          else if (mobileUrl) runRescan('mobile');
+        });
+
+        wrap.addEventListener('submit', function (e) {
+          var form = e.target.closest && e.target.closest('.scan-list__delete-form');
+          if (!form) return;
+          e.preventDefault();
+          var msg = (form.action || '').indexOf('delete-batch') !== -1
+            ? 'Delete this scan group? Both reports will be removed. This cannot be undone.'
+            : 'Delete this scan? This cannot be undone.';
+          if (!window.showConfirm) { form.submit(); return; }
+          window.showConfirm(msg, { title: 'Delete scan', okLabel: 'Delete', danger: true }).then(function (ok) {
+            if (ok) form.submit();
+          });
+        });
+
+        wrap.addEventListener('click', function (e) {
+          var trigger = e.target.closest && e.target.closest('.actions-dropdown__trigger');
+          var dropdown = e.target.closest && e.target.closest('.actions-dropdown');
+          if (trigger && dropdown) {
+            e.stopPropagation();
+            var menu = dropdown.querySelector('.actions-dropdown__menu');
+            if (!menu) return;
+            var isOpen = dropdown.getAttribute('data-open') === 'true';
+            document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
+              if (d !== dropdown) {
+                d.removeAttribute('data-open');
+                var t = d.querySelector('.actions-dropdown__trigger');
+                var m = d.querySelector('.actions-dropdown__menu');
+                if (t) t.setAttribute('aria-expanded', 'false');
+                if (m) m.setAttribute('hidden', '');
+              }
+            });
+            if (isOpen) {
+              dropdown.removeAttribute('data-open');
+              trigger.setAttribute('aria-expanded', 'false');
+              menu.setAttribute('hidden', '');
+            } else {
+              dropdown.setAttribute('data-open', 'true');
+              trigger.setAttribute('aria-expanded', 'true');
+              menu.removeAttribute('hidden');
+            }
+          }
+          if (e.target.closest && e.target.closest('.actions-dropdown__item, .actions-dropdown__form button')) {
+            var d = e.target.closest('.actions-dropdown');
+            if (d) {
+              d.removeAttribute('data-open');
+              var t = d.querySelector('.actions-dropdown__trigger');
+              var m = d.querySelector('.actions-dropdown__menu');
+              if (t) t.setAttribute('aria-expanded', 'false');
+              if (m) m.setAttribute('hidden', '');
+            }
+          }
+        });
+      }
+      document.addEventListener('click', function (e) {
+        if (e.target.closest && e.target.closest('.actions-dropdown')) return;
+        document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
+          d.removeAttribute('data-open');
+          var t = d.querySelector('.actions-dropdown__trigger');
+          var m = d.querySelector('.actions-dropdown__menu');
+          if (t) t.setAttribute('aria-expanded', 'false');
+          if (m) m.setAttribute('hidden', '');
+        });
+      });
+    })();
+  </script>
+<%- include('partials/footer') %>

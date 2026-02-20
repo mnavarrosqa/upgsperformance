@@ -1,0 +1,35 @@
+{
+  "name": "upgs-perf",
+  "version": "1.0.0",
+  "description": "UPGS Perf – Performance and insight scan tool using Lighthouse",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop upgs-perf",
+    "pm2:restart": "pm2 restart upgs-perf",
+    "pm2:logs": "pm2 logs upgs-perf",
+    "pm2:status": "pm2 status"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "better-sqlite3": "^11.6.0",
+    "chrome-launcher": "^1.1.0",
+    "connect-sqlite3": "^0.9.13",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.21.0",
+    "express-rate-limit": "^8.2.1",
+    "express-session": "^1.18.0",
+    "lighthouse": "^13.0.0",
+    "puppeteer-core": "^23.11.1"
+  },
+  "devDependencies": {
+    "pm2": "^5.4.0"
+  }
+}

@@ -1,0 +1,392 @@
+<%- include('partials/header') %>
+  <div class="page trends-page">
+    <nav class="trends-nav">
+      <a href="/dashboard" class="trends-nav__back"><svg class="icon" aria-hidden="true"><use href="#icon-arrow-left"/></svg> Dashboard</a>
+      <a href="/scans" class="trends-nav__back"><svg class="icon" aria-hidden="true"><use href="#icon-list"/></svg> Scan history</a>
+    </nav>
+
+    <header class="trends-hero">
+      <h1 class="trends-hero__title"><svg class="icon trends-hero__icon" aria-hidden="true"><use href="#icon-gauge"/></svg> Trends</h1>
+      <p class="trends-hero__subtitle">See how a website’s scores evolve across scans over time.</p>
+    </header>
+
+    <section class="card trends-card">
+      <div class="trends-toolbar">
+        <label for="trends-url-select" class="trends-toolbar__label">Website</label>
+        <select id="trends-url-select" class="trends-select" aria-label="Select a website to view trends">
+          <option value="">Select a website…</option>
+          <% if (typeof distinctUrls !== 'undefined' && distinctUrls && distinctUrls.length) { %>
+            <% distinctUrls.forEach(function(u) { %>
+              <option value="<%= encodeURIComponent(u) %>"><%= u %></option>
+            <% }) %>
+          <% } %>
+        </select>
+      </div>
+
+      <div id="trends-empty" class="trends-empty" aria-live="polite">
+        <svg class="trends-empty__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-gauge"/></svg>
+        <p class="trends-empty__text">Select a website above to see score trends.</p>
+        <p class="trends-empty__hint">You need at least two scans for the same URL to see evolution.</p>
+      </div>
+
+      <div id="trends-loading" class="trends-loading" hidden aria-busy="true">
+        <div class="spinner" aria-hidden="true"></div>
+        <p class="trends-loading__text">Loading trend data…</p>
+      </div>
+
+      <div id="trends-charts" class="trends-charts" hidden>
+        <div id="trends-summary" class="trends-summary" aria-live="polite"></div>
+        <div class="trends-chart-section">
+          <h2 class="trends-chart-section__title">Category scores over time</h2>
+        <div class="trends-chart-wrap">
+          <canvas id="trends-categories-chart" aria-label="Category scores over time"></canvas>
+        </div>
+        </div>
+        <div class="trends-chart-section trends-chart-section--metrics">
+          <h2 class="trends-chart-section__title">Core Web Vitals &amp; metrics</h2>
+        <div class="trends-chart-wrap">
+          <canvas id="trends-metrics-chart" aria-label="Key metrics over time"></canvas>
+        </div>
+        </div>
+      </div>
+
+      <div id="trends-single" class="trends-empty trends-empty--single" hidden aria-live="polite">
+        <p class="trends-empty__text">Only one scan for this URL.</p>
+        <p class="trends-empty__hint">Run at least one more scan (same URL) to see score trends over time.</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+  <script>
+    (function () {
+      var select = document.getElementById('trends-url-select');
+      var empty = document.getElementById('trends-empty');
+      var loading = document.getElementById('trends-loading');
+      var chartsWrap = document.getElementById('trends-charts');
+      var singleMsg = document.getElementById('trends-single');
+      var summaryEl = document.getElementById('trends-summary');
+      var categoriesChartEl = document.getElementById('trends-categories-chart');
+      var metricsChartEl = document.getElementById('trends-metrics-chart');
+
+      var categoriesChart = null;
+      var metricsChart = null;
+
+      var categoryColors = {
+        performance: '#3fb950',
+        accessibility: '#d4a72c',
+        'best-practices': '#5393f8',
+        seo: '#a371f7'
+      };
+
+      var categoryLabels = {
+        performance: 'Performance',
+        accessibility: 'Accessibility',
+        'best-practices': 'Best Practices',
+        seo: 'SEO'
+      };
+
+      var metricLabels = {
+        'first-contentful-paint': 'FCP',
+        'largest-contentful-paint': 'LCP',
+        'total-blocking-time': 'TBT',
+        'cumulative-layout-shift': 'CLS',
+        'speed-index': 'Speed Index',
+        interactive: 'TTI'
+      };
+
+      function show(el) { if (el) el.removeAttribute('hidden'); }
+      function hide(el) { if (el) el.setAttribute('hidden', ''); }
+
+      function formatDate(createdAt) {
+        var d = new Date(createdAt);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      }
+
+      function formatShortDate(createdAt) {
+        var d = new Date(createdAt);
+        return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+
+      /** Build summary HTML for runs and URL (URL, run count, date range, score grid). */
+      function buildSummaryHtml(runs, url) {
+        if (!runs.length) return '';
+        var firstRun = runs[0];
+        var lastRun = runs[runs.length - 1];
+        var startDate = firstRun[0].created_at;
+        var endDate = lastRun[lastRun.length - 1].created_at;
+        var runCount = runs.length;
+        var totalScans = runs.reduce(function (sum, r) { return sum + r.length; }, 0);
+        var startStr = formatShortDate(startDate);
+        var endStr = formatShortDate(endDate);
+        var dateRange = startStr === endStr ? startStr : startStr + ' – ' + endStr;
+        var categoryIds = ['performance', 'accessibility', 'best-practices', 'seo'];
+        var meta = runCount + ' run' + (runCount === 1 ? '' : 's') + ' · ' + dateRange + (totalScans > runCount ? ' · ' + totalScans + ' scan' + (totalScans === 1 ? '' : 's') + ' (M+D)' : '');
+        var summary = '<div class="trends-summary__top"><p class="trends-summary__url" title="' + (url || '').replace(/"/g, '&quot;') + '">' + (url || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p><p class="trends-summary__meta">' + meta + '</p></div>';
+        var gridItems = [];
+        categoryIds.forEach(function (catId) {
+          var min = 100;
+          var max = 0;
+          runs.forEach(function (run) {
+            run.forEach(function (s) {
+              var n = (s.categories && s.categories[catId]);
+              if (n != null) { min = Math.min(min, n); max = Math.max(max, n); }
+            });
+          });
+          if (min <= 100 && max >= 0) {
+            var label = categoryLabels[catId] || catId;
+            var value = min === max ? String(min) : min + '–' + max;
+            gridItems.push('<div class="trends-summary__score-item trends-summary__score-item--' + catId + '"><span class="trends-summary__score-dot" aria-hidden="true"></span><span class="trends-summary__score-label">' + label + '</span><span class="trends-summary__score-value">' + value + '</span></div>');
+          }
+        });
+        if (gridItems.length) summary += '<div class="trends-summary__grid">' + gridItems.join('') + '</div>';
+        return summary;
+      }
+
+      /** Group scans by run (same run_id = one run; no run_id = one scan per run). Runs ordered by earliest scan time. */
+      function groupScansByRun(scans) {
+        var runMap = {};
+        scans.forEach(function (s) {
+          var key = (s.run_id && String(s.run_id)) || 'single-' + s.id;
+          if (!runMap[key]) runMap[key] = [];
+          runMap[key].push(s);
+        });
+        var runs = Object.values(runMap).map(function (r) {
+          r.sort(function (a, b) {
+            return (a.formFactor === 'desktop' ? 1 : 0) - (b.formFactor === 'desktop' ? 1 : 0);
+          });
+          return r;
+        });
+        runs.sort(function (a, b) {
+          return new Date(a[0].created_at) - new Date(b[0].created_at);
+        });
+        return runs;
+      }
+
+      function getScanInRun(run, formFactor) {
+        return run.find(function (s) { return s.formFactor === formFactor; }) || null;
+      }
+
+      function buildCategoryDatasets(runs) {
+        var categoryIds = ['performance', 'accessibility', 'best-practices', 'seo'];
+        var labels = runs.map(function (run) {
+          var hasM = run.some(function (s) { return s.formFactor === 'mobile'; });
+          var hasD = run.some(function (s) { return s.formFactor === 'desktop'; });
+          var parts = [];
+          if (hasM) parts.push('M');
+          if (hasD) parts.push('D');
+          return formatDate(run[0].created_at) + (parts.length > 0 ? ' (' + parts.join('+') + ')' : '');
+        });
+        var datasets = [];
+        var devices = ['mobile', 'desktop'];
+        categoryIds.forEach(function (catId) {
+          devices.forEach(function (formFactor) {
+            var values = runs.map(function (run) {
+              var s = getScanInRun(run, formFactor);
+              if (!s || !s.categories || s.categories[catId] == null) return null;
+              return s.categories[catId];
+            });
+            if (values.some(function (v) { return v != null; })) {
+              var deviceLabel = formFactor === 'desktop' ? 'Desktop' : 'Mobile';
+              var color = categoryColors[catId] || '#7d8590';
+              datasets.push({
+                label: (categoryLabels[catId] || catId) + ' (' + deviceLabel + ')',
+                data: values,
+                borderColor: color,
+                backgroundColor: 'transparent',
+                borderWidth: formFactor === 'desktop' ? 2 : 2,
+                borderDash: formFactor === 'desktop' ? [6, 4] : [],
+                tension: 0.2,
+                spanGaps: true
+              });
+            }
+          });
+        });
+        return { labels: labels, datasets: datasets };
+      }
+
+      function buildMetricsDatasets(runs) {
+        var metricIds = ['first-contentful-paint', 'largest-contentful-paint', 'total-blocking-time', 'cumulative-layout-shift', 'speed-index', 'interactive'];
+        var labels = runs.map(function (run) {
+          var hasM = run.some(function (s) { return s.formFactor === 'mobile'; });
+          var hasD = run.some(function (s) { return s.formFactor === 'desktop'; });
+          var parts = [];
+          if (hasM) parts.push('M');
+          if (hasD) parts.push('D');
+          return formatDate(run[0].created_at) + (parts.length > 0 ? ' (' + parts.join('+') + ')' : '');
+        });
+        var datasets = [];
+        var palette = ['#3fb950', '#5393f8', '#d4a72c', '#a371f7', '#7ee787', '#79c0ff'];
+        var devices = ['mobile', 'desktop'];
+        metricIds.forEach(function (metricId, idx) {
+          devices.forEach(function (formFactor) {
+            var values = runs.map(function (run) {
+              var s = getScanInRun(run, formFactor);
+              if (!s || !s.metrics || !s.metrics[metricId]) return null;
+              var v = s.metrics[metricId].value;
+              if (v == null) return null;
+              if (metricId === 'cumulative-layout-shift') return v;
+              return Math.round(v / 1000 * 10) / 10;
+            });
+            if (values.some(function (v) { return v != null; })) {
+              var deviceLabel = formFactor === 'desktop' ? 'D' : 'M';
+              datasets.push({
+                label: (metricLabels[metricId] || metricId) + ' (' + deviceLabel + ')',
+                data: values,
+                borderColor: palette[idx % palette.length],
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                borderDash: formFactor === 'desktop' ? [6, 4] : [],
+                tension: 0.2,
+                spanGaps: true,
+                yAxisID: metricId === 'cumulative-layout-shift' ? 'y1' : 'y0'
+              });
+            }
+          });
+        });
+        return { labels: labels, datasets: datasets };
+      }
+
+      function destroyCharts() {
+        if (categoriesChart) {
+          categoriesChart.destroy();
+          categoriesChart = null;
+        }
+        if (metricsChart) {
+          metricsChart.destroy();
+          metricsChart = null;
+        }
+      }
+
+      function renderCharts(data) {
+        var scans = data.scans || [];
+        if (scans.length < 2) {
+          hide(chartsWrap);
+          hide(empty);
+          hide(loading);
+          show(singleMsg);
+          return;
+        }
+        var runs = groupScansByRun(scans);
+        if (summaryEl) summaryEl.innerHTML = buildSummaryHtml(runs, data.url);
+        destroyCharts();
+        var catData = buildCategoryDatasets(runs);
+        var metData = buildMetricsDatasets(runs);
+
+        var commonOptions = {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 12, right: 16, bottom: 8, left: 8 } },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { font: { size: 13 }, padding: 16, boxWidth: 14 }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(42, 46, 58, 0.8)' },
+              ticks: { color: '#7d8590', maxRotation: 45, maxTicksLimit: 10, font: { size: 12 }, padding: 8 }
+            },
+            y: {
+              min: 0,
+              max: 100,
+              grid: { color: 'rgba(42, 46, 58, 0.8)' },
+              ticks: { color: '#7d8590', font: { size: 12 }, padding: 8 }
+            }
+          }
+        };
+
+        categoriesChart = new Chart(categoriesChartEl, {
+          type: 'line',
+          data: catData,
+          options: commonOptions
+        });
+
+        var hasCls = metData.datasets && metData.datasets.some(function (d) {
+          return d.yAxisID === 'y1';
+        });
+        var metricScales = {
+          x: {
+            grid: { color: 'rgba(42, 46, 58, 0.8)' },
+            ticks: { color: '#7d8590', maxRotation: 45, maxTicksLimit: 10, font: { size: 12 }, padding: 8 }
+          },
+          y0: {
+            type: 'linear',
+            position: 'left',
+            min: 0,
+            grid: { color: 'rgba(42, 46, 58, 0.8)' },
+            ticks: { color: '#7d8590', font: { size: 12 }, padding: 8 }
+          },
+          y1: hasCls ? {
+            type: 'linear',
+            position: 'right',
+            min: 0,
+            grid: { drawOnChartArea: false },
+            ticks: { color: '#7d8590', font: { size: 12 }, padding: 8 }
+          } : undefined
+        };
+        if (!hasCls) delete metricScales.y1;
+
+        if (metData.datasets && metData.datasets.length > 0) {
+          metricsChart = new Chart(metricsChartEl, {
+            type: 'line',
+            data: metData,
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              layout: { padding: { top: 12, right: 16, bottom: 8, left: 8 } },
+              plugins: {
+                legend: {
+                  position: 'bottom',
+                  labels: { font: { size: 13 }, padding: 16, boxWidth: 14 }
+                }
+              },
+              scales: metricScales
+            }
+          });
+        }
+
+        hide(empty);
+        hide(loading);
+        hide(singleMsg);
+        show(chartsWrap);
+      }
+
+      function loadTrends(url) {
+        if (!url) {
+          show(empty);
+          hide(loading);
+          hide(chartsWrap);
+          hide(singleMsg);
+          destroyCharts();
+          return;
+        }
+        show(loading);
+        hide(empty);
+        hide(chartsWrap);
+        hide(singleMsg);
+        fetch('/trends/data?url=' + encodeURIComponent(url))
+          .then(function (r) {
+            if (!r.ok) throw new Error('Failed to load trend data');
+            return r.json();
+          })
+          .then(function (data) {
+            renderCharts(data);
+          })
+          .catch(function () {
+            hide(loading);
+            show(empty);
+            if (window.showAlert) window.showAlert('Could not load trend data. Try again.');
+          });
+      }
+
+      if (select) {
+        select.addEventListener('change', function () {
+          var val = select.value;
+          loadTrends(val ? decodeURIComponent(val) : '');
+        });
+      }
+    })();
+  </script>
+<%- include('partials/footer') %>

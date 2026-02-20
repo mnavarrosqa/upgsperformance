@@ -1,0 +1,95 @@
+<%- include('partials/header') %>
+  <div class="page report-detail guest-report">
+    <nav class="report-nav">
+      <a href="/" class="report-nav__back"><svg class="icon" aria-hidden="true"><use href="#icon-arrow-left"/></svg> Home</a>
+    </nav>
+
+    <header class="card report-hero">
+      <div class="report-hero__top">
+        <h1 class="report-hero__title">Your scan result</h1>
+        <span class="report-hero__device report-hero__device--<%= report.formFactor === 'desktop' ? 'desktop' : 'mobile' %>"><%= report.formFactor === 'desktop' ? 'Desktop' : 'Mobile' %></span>
+      </div>
+      <a href="<%= report.url %>" target="_blank" rel="noopener" class="report-hero__url">
+        <svg class="icon" aria-hidden="true"><use href="#icon-link"/></svg>
+        <span class="report-hero__url-text"><%= report.url %></span>
+      </a>
+      <p class="report-hero__meta">Scanned just now · Free scan <%= guestScansUsed %> of <%= guestScansLimit %></p>
+    </header>
+
+    <% if (report.summary && report.summary.categories && Object.keys(report.summary.categories).length) { %>
+      <section class="card report-scores">
+        <h2 class="report-scores__title"><svg class="icon icon--title" aria-hidden="true"><use href="#icon-gauge"/></svg> Overview</h2>
+        <div class="score-grid score-grid--report">
+          <% Object.entries(report.summary.categories).forEach(function(entry) {
+            var id = entry[0];
+            var score = entry[1];
+            var label = id.replace(/-/g, ' ');
+            label = label.split(' ').map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+          %>
+            <div class="score-card score-card--report score-card--category score-card--<%= id %>">
+              <span class="score-card__ring" style="--score: <%= score %>"></span>
+              <span class="score-label"><%= label %></span>
+              <span class="score-value"><%= score %></span>
+            </div>
+          <% }) %>
+        </div>
+      </section>
+    <% } %>
+    <% if (report.summary && report.summary.metrics && Object.keys(report.summary.metrics).length) { %><%- include('partials/report-speed-viz', { data: report }) %><% } %>
+    <% if (report.summary && report.summary.metrics && Object.keys(report.summary.metrics).length) { %>
+      <section class="card report-metrics">
+        <h2 class="card-title">Key metrics</h2>
+        <p class="report-metrics__intro">Core Web Vitals and loading metrics from this run.</p>
+        <ul class="metrics-list metrics-list--report">
+          <% Object.entries(report.summary.metrics).forEach(function(entry) {
+            var id = entry[0];
+            var m = entry[1];
+            var label = id.replace(/-/g, ' ');
+            label = label.split(' ').map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+          %>
+            <li class="metrics-list__item">
+              <span class="metrics-list__label"><%= label %></span>
+              <span class="metrics-list__value"><%= m.displayValue %></span>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <% if (report.summary && report.summary.recommendations && report.summary.recommendations.length) { %>
+      <section class="card report-recommendations">
+        <h2 class="card-title">Needs attention</h2>
+        <p class="report-recommendations__intro">Issues and opportunities from this run (sample). Create an account to see the full list and export.</p>
+        <ul class="report-recommendations__list">
+          <% report.summary.recommendations.slice(0, 8).forEach(function(rec) { %>
+            <li class="report-recommendations__item">
+              <div class="report-recommendations__head">
+                <span class="report-recommendations__score report-recommendations__score--<%= rec.score >= 50 ? 'average' : 'poor' %>"><%= rec.score %></span>
+                <span class="report-recommendations__title"><%= rec.title %></span>
+                <% if (rec.displayValue) { %><span class="report-recommendations__value"><%= rec.displayValue %></span><% } %>
+              </div>
+              <% if (rec.description && typeof linkifyDescription === 'function') { %><p class="report-recommendations__desc"><%- linkifyDescription(rec.description) %></p><% } else if (rec.description) { %><p class="report-recommendations__desc"><%= rec.description %></p><% } %>
+            </li>
+          <% }) %>
+        </ul>
+      </section>
+    <% } %>
+
+    <section class="card guest-upsell" aria-labelledby="guest-upsell-title">
+      <h2 id="guest-upsell-title" class="guest-upsell__title"><svg class="icon guest-upsell__icon" aria-hidden="true"><use href="#icon-lightning"/></svg> Want more?</h2>
+      <p class="guest-upsell__text">Create a free account to unlock:</p>
+      <ul class="guest-upsell__list">
+        <li>Export to <strong>PDF</strong> and <strong>JSON</strong></li>
+        <li>Full-page <strong>screenshots</strong> of each run</li>
+        <li>Full <strong>recommendations</strong> and shareable report links</li>
+        <li><strong>Scan history</strong> and search</li>
+        <li><strong>Trends</strong> — see how scores change over time</li>
+        <li>Unlimited scans</li>
+      </ul>
+      <div class="guest-upsell__cta">
+        <a href="/register" class="btn btn--primary btn--lg"><svg class="icon" aria-hidden="true"><use href="#icon-user"/></svg> Create free account</a>
+        <a href="/" class="btn btn--ghost"><%= guestScansUsed < guestScansLimit ? 'Run another free scan' : 'Back to home' %></a>
+      </div>
+    </section>
+  </div>
+<%- include('partials/footer') %>

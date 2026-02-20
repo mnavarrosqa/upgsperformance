@@ -1,0 +1,47 @@
+# UPGS Perf – Docker Compose
+#
+# Host ports are non-default (3001, 8080, 8443) to avoid conflict with nginx (80/443) and MySQL (3306).
+#
+# 1. Set a session secret:  export SESSION_SECRET=$(openssl rand -hex 32)
+# 2. Start:               docker compose up -d
+# 3. Open:                http://localhost:3001  (app only) or https://perf.upgservicios.com (behind nginx → :8443)
+#
+# Optional: use .env file and run  docker compose --env-file .env up -d
+#
+# Optional SSL: put cert.pem and key.pem in ./certs, then:
+#   docker compose --profile ssl up -d
+#   Caddy listens on host 8080 (HTTP) and 8443 (HTTPS). Proxy from nginx to https://127.0.0.1:8443 or to http://127.0.0.1:3001.
+
+services:
+  app:
+    build: .
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_PATH=/app/data/upgs.db
+      - CHROME_PATH=/usr/bin/chromium
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
+      # For HTTP (no HTTPS) set COOKIE_SECURE=0 in .env so the session cookie is sent
+      - COOKIE_SECURE=${COOKIE_SECURE:-}
+    volumes:
+      - upgs-data:/app/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:alpine
+    profiles:
+      - ssl
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./certs:/etc/certs:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  upgs-data:

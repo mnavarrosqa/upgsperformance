@@ -1,0 +1,282 @@
+<%- include('partials/header') %>
+  <div class="page scans-page history-page">
+    <nav class="scans-nav">
+      <a href="/dashboard" class="scans-nav__back"><svg class="icon" aria-hidden="true"><use href="#icon-arrow-left"/></svg> Dashboard</a>
+      <a href="/dashboard" class="btn btn--primary btn--sm"><svg class="icon" aria-hidden="true"><use href="#icon-run"/></svg> New scan</a>
+    </nav>
+
+    <header class="scans-hero history-hero">
+      <h1 class="scans-hero__title"><svg class="icon history-hero__icon" aria-hidden="true"><use href="#icon-list"/></svg> Scan history</h1>
+      <p class="scans-hero__subtitle">Chronological list of your performance scans.<% if (typeof pagination !== 'undefined' && pagination) { %> <span class="scans-hero__count"><%= pagination.totalCount %> scan<%= pagination.totalCount === 1 ? '' : 's' %><% if (typeof searchQuery !== 'undefined' && searchQuery) { %> matching "<%= searchQuery %>"<% } %></span><% } %></p>
+    </header>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="scans-page-error" role="alert"><%= error %></div>
+    <% } %>
+    <section class="card scans-list-card history-card">
+      <div class="history-toolbar">
+        <form action="/scans" method="get" class="scans-search history-search" role="search">
+          <label for="scans-search-input" class="visually-hidden">Search by URL</label>
+          <input type="search" id="scans-search-input" name="q" value="<%= typeof searchQuery !== 'undefined' && searchQuery ? searchQuery : '' %>" class="scans-search__input history-search__input" placeholder="Search by URL…" aria-label="Search scans by URL">
+          <button type="submit" class="btn btn--ghost btn--sm scans-search__submit"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-search"/></svg> Search</button>
+          <% if (typeof searchQuery !== 'undefined' && searchQuery) { %>
+            <a href="/scans" class="btn btn--ghost btn--sm">Clear</a>
+          <% } %>
+        </form>
+      </div>
+      <% if (scanGroups && scanGroups.length) { %>
+        <div class="history-wrap" data-bulk-redirect="scans">
+          <div class="bulk-actions bulk-actions--hidden" id="scans-bulk-actions" role="region" aria-live="polite">
+            <span class="bulk-actions__count"><span id="scans-bulk-count">0</span> selected</span>
+            <button type="button" class="btn btn--danger btn--sm bulk-actions__delete" id="scans-bulk-delete">Delete selected</button>
+          </div>
+          <div class="history-list-header">
+            <label class="history-select-all">
+              <input type="checkbox" class="bulk-select-all__input" id="scans-select-all" aria-label="Select all scans">
+              <span class="history-select-all__label">Select all</span>
+            </label>
+          </div>
+          <ul class="history-list" aria-label="Scan history">
+          <% scanGroups.forEach(function(group) {
+            var scans = group;
+            var first = scans[0];
+            var isDesktop = function(s) { return (s.options && s.options.formFactor) === 'desktop'; };
+            var scanIds = scans.map(function(s) { return s.id; }).join(',');
+            var d = new Date(first.created_at);
+            var now = new Date();
+            var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            var itemDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            var diffDays = Math.floor((today - itemDate) / (24*60*60*1000));
+            var dateLabel = diffDays === 0 ? 'Today' : diffDays === 1 ? 'Yesterday' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+            var timeStr = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+          %>
+            <li class="history-item" data-scan-ids="<%= scanIds %>">
+              <div class="history-item__rail">
+                <span class="history-item__dot" aria-hidden="true"></span>
+                <span class="history-item__date" title="<%= new Date(first.created_at).toLocaleString() %>">
+                  <span class="history-item__date-label"><%= dateLabel %></span>
+                  <span class="history-item__time"><%= timeStr %></span>
+                </span>
+              </div>
+              <div class="history-item__main">
+                <label class="history-item__select">
+                  <input type="checkbox" class="bulk-row-select__input" value="<%= scanIds %>" aria-label="Select this scan">
+                  <span class="visually-hidden">Select</span>
+                </label>
+                <a href="/scans/<%= first.id %>" class="history-item__url" title="<%= first.url %>"><%= first.url %></a>
+                <div class="history-item__meta">
+                  <% if (scans.length === 1 && first.summary && first.summary.categories) { %>
+                    <div class="scores scan-list__scores history-item__scores">
+                      <% Object.entries(first.summary.categories).forEach(function(entry) {
+                        var id = entry[0];
+                        var score = entry[1];
+                        var short = id === 'performance' ? 'P' : id === 'accessibility' ? 'A' : id === 'best-practices' ? 'BP' : 'SEO';
+                      %>
+                        <span class="score-badge score-badge--category score-badge--compact score-badge--<%= id %>" title="<%= id %>"><%= short %> <%= score %></span>
+                      <% }) %>
+                    </div>
+                  <% } else if (scans.some(function(s) { return s.summary && s.summary.categories; })) { %>
+                    <div class="scan-list__scores-group history-item__scores">
+                      <% scans.forEach(function(scan) { %>
+                        <% if (scan.summary && scan.summary.categories) { %>
+                          <div class="scan-list__scores-device">
+                            <span class="scan-list__device-label scan-list__device-label--<%= isDesktop(scan) ? 'desktop' : 'mobile' %>"><%= isDesktop(scan) ? 'D' : 'M' %></span>
+                            <div class="scores scan-list__scores">
+                              <% Object.entries(scan.summary.categories).forEach(function(entry) {
+                                var id = entry[0];
+                                var score = entry[1];
+                                var short = id === 'performance' ? 'P' : id === 'accessibility' ? 'A' : id === 'best-practices' ? 'BP' : 'SEO';
+                              %>
+                                <span class="score-badge score-badge--category score-badge--compact score-badge--<%= id %>" title="<%= id %>"><%= short %> <%= score %></span>
+                              <% }) %>
+                            </div>
+                          </div>
+                        <% } %>
+                      <% }) %>
+                    </div>
+                  <% } %>
+                </div>
+              </div>
+              <div class="history-item__actions">
+                <div class="actions-dropdown">
+                  <button type="button" class="actions-dropdown__trigger" aria-expanded="false" aria-haspopup="true" aria-label="Actions"><span>Actions</span><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-chevron-down"/></svg></button>
+                  <div class="actions-dropdown__menu" role="menu" hidden>
+                    <% scans.forEach(function(scan) { %>
+                      <a href="/scans/<%= scan.id %>" class="actions-dropdown__item" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-external"/></svg> View report (<%= isDesktop(scan) ? 'Desktop' : 'Mobile' %>)</a>
+                    <% }) %>
+                    <% if (scans.length > 1) { %>
+                      <form action="/scans/delete-batch" method="post" class="actions-dropdown__form scan-list__delete-form" role="none">
+                        <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+                        <input type="hidden" name="redirect" value="scans">
+                        <% scans.forEach(function(scan) { %><input type="hidden" name="ids" value="<%= scan.id %>"><% }) %>
+                        <button type="submit" class="actions-dropdown__item actions-dropdown__item--danger" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-trash"/></svg> Delete</button>
+                      </form>
+                    <% } else { %>
+<form action="/scans/<%= first.id %>/delete" method="post" class="actions-dropdown__form scan-list__delete-form" role="none">
+                          <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+                          <input type="hidden" name="redirect" value="scans">
+                          <button type="submit" class="actions-dropdown__item actions-dropdown__item--danger" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-trash"/></svg> Delete</button>
+                      </form>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
+            </li>
+          <% }) %>
+          </ul>
+        </div>
+      <% } else { %>
+        <div class="scans-empty">
+          <% if (typeof searchQuery !== 'undefined' && searchQuery) { %>
+            <svg class="scans-empty__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-search"/></svg>
+            <p class="scans-empty__text">No scans match your search</p>
+            <p class="scans-empty__hint">Try a different URL or <a href="/scans">view all scans</a>.</p>
+          <% } else { %>
+            <svg class="scans-empty__icon" viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-list"/></svg>
+            <p class="scans-empty__text">No scans yet</p>
+            <p class="scans-empty__hint">Run a scan from the dashboard to see results here.</p>
+            <a href="/dashboard" class="btn btn--primary scans-empty__cta"><svg class="icon" aria-hidden="true"><use href="#icon-run"/></svg> Go to dashboard</a>
+          <% } %>
+        </div>
+      <% } %>
+      <% if (typeof pagination !== 'undefined' && pagination) { %>
+        <%- include('partials/pagination', { baseUrl: '/scans', pagination: pagination, searchQuery: typeof searchQuery !== 'undefined' ? searchQuery : undefined }) %>
+      <% } %>
+    </section>
+  </div>
+  <script>
+    (function () {
+      var forms = document.querySelectorAll('.scan-list__delete-form');
+      forms.forEach(function (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault();
+          var msg = (form.action || '').indexOf('delete-batch') !== -1
+            ? 'Delete this scan group? Both reports will be removed. This cannot be undone.'
+            : 'Delete this scan? This cannot be undone.';
+          if (!window.showConfirm) { form.submit(); return; }
+          window.showConfirm(msg, { title: 'Delete scan', okLabel: 'Delete', danger: true }).then(function (ok) {
+            if (ok) form.submit();
+          });
+        });
+      });
+      document.querySelectorAll('.actions-dropdown').forEach(function (dropdown) {
+        var trigger = dropdown.querySelector('.actions-dropdown__trigger');
+        var menu = dropdown.querySelector('.actions-dropdown__menu');
+        if (!trigger || !menu) return;
+        function open() {
+          dropdown.setAttribute('data-open', 'true');
+          trigger.setAttribute('aria-expanded', 'true');
+          menu.removeAttribute('hidden');
+        }
+        function close() {
+          dropdown.removeAttribute('data-open');
+          trigger.setAttribute('aria-expanded', 'false');
+          menu.setAttribute('hidden', '');
+        }
+        trigger.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (dropdown.getAttribute('data-open') === 'true') close();
+          else {
+            document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
+              if (d !== dropdown) {
+                d.removeAttribute('data-open');
+                d.querySelector('.actions-dropdown__trigger').setAttribute('aria-expanded', 'false');
+                d.querySelector('.actions-dropdown__menu').setAttribute('hidden', '');
+              }
+            });
+            open();
+          }
+        });
+        dropdown.querySelectorAll('.actions-dropdown__item, .actions-dropdown__form button').forEach(function (el) {
+          el.addEventListener('click', function () { close(); });
+        });
+        document.addEventListener('click', function (e) {
+          if (!dropdown.contains(e.target)) close();
+        });
+      });
+      (function bulkSelection() {
+        var wrap = document.querySelector('.history-wrap[data-bulk-redirect="scans"], .scans-table-wrap[data-bulk-redirect]');
+        if (!wrap) return;
+        var selectAll = document.getElementById('scans-select-all');
+        var bulkBar = document.getElementById('scans-bulk-actions');
+        var bulkCount = document.getElementById('scans-bulk-count');
+        var bulkDeleteBtn = document.getElementById('scans-bulk-delete');
+        var rowCheckboxes = wrap.querySelectorAll('.bulk-row-select__input');
+        var redirect = wrap.getAttribute('data-bulk-redirect') === 'dashboard' ? 'dashboard' : 'scans';
+
+        function getSelectedIds() {
+          var ids = [];
+          rowCheckboxes.forEach(function (cb) {
+            if (cb.checked && cb.value) ids.push.apply(ids, cb.value.split(','));
+          });
+          return ids;
+        }
+
+        function updateBulkBar() {
+          var ids = getSelectedIds();
+          var n = ids.length;
+          if (bulkCount) bulkCount.textContent = n;
+          if (bulkBar) {
+            if (n > 0) { bulkBar.classList.remove('bulk-actions--hidden'); bulkBar.classList.add('bulk-actions--visible'); }
+            else { bulkBar.classList.add('bulk-actions--hidden'); bulkBar.classList.remove('bulk-actions--visible'); }
+          }
+          if (selectAll) {
+            selectAll.checked = n > 0 && n === rowCheckboxes.length;
+            selectAll.indeterminate = n > 0 && n < rowCheckboxes.length;
+          }
+        }
+
+        if (selectAll) {
+          selectAll.addEventListener('change', function () {
+            rowCheckboxes.forEach(function (cb) { cb.checked = selectAll.checked; });
+            updateBulkBar();
+          });
+        }
+        rowCheckboxes.forEach(function (cb) {
+          cb.addEventListener('change', updateBulkBar);
+        });
+
+        if (bulkDeleteBtn) {
+          bulkDeleteBtn.addEventListener('click', function () {
+            var ids = getSelectedIds();
+            if (ids.length === 0) return;
+            var msg = ids.length === 1
+              ? 'Delete this scan? This cannot be undone.'
+              : 'Delete ' + ids.length + ' selected scan(s)? This cannot be undone.';
+            if (!window.showConfirm) { submitBulkDelete(ids); return; }
+            window.showConfirm(msg, { title: 'Delete scan(s)', okLabel: 'Delete', danger: true }).then(function (ok) {
+              if (ok) submitBulkDelete(ids);
+            });
+          });
+        }
+
+        function submitBulkDelete(ids) {
+          var form = document.createElement('form');
+          form.method = 'post';
+          form.action = '/scans/delete-batch';
+          var csrfMeta = document.querySelector('meta[name="csrf-token"]');
+          if (csrfMeta && csrfMeta.getAttribute('content')) {
+            var inputCsrf = document.createElement('input');
+            inputCsrf.type = 'hidden';
+            inputCsrf.name = '_csrf';
+            inputCsrf.value = csrfMeta.getAttribute('content');
+            form.appendChild(inputCsrf);
+          }
+          var inputRedirect = document.createElement('input');
+          inputRedirect.type = 'hidden';
+          inputRedirect.name = 'redirect';
+          inputRedirect.value = redirect;
+          form.appendChild(inputRedirect);
+          ids.forEach(function (id) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'ids';
+            input.value = id;
+            form.appendChild(input);
+          });
+          document.body.appendChild(form);
+          form.submit();
+        }
+      })();
+    })();
+  </script>
+<%- include('partials/footer') %>

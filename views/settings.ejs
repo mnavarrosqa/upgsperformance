@@ -1,0 +1,97 @@
+<%- include('partials/header') %>
+  <div class="page settings-page">
+    <nav class="settings-nav">
+      <a href="/dashboard" class="settings-nav__back"><svg class="icon" aria-hidden="true"><use href="#icon-arrow-left"/></svg> Dashboard</a>
+    </nav>
+    <div class="settings-header">
+      <h1 class="settings-header__title">Settings</h1>
+      <p class="settings-header__subtitle">Manage your profile and account security</p>
+    </div>
+    <% if (typeof success !== 'undefined' && success) { %>
+      <div class="settings-alert settings-alert--success" role="status">
+        <svg class="icon settings-alert__icon" aria-hidden="true"><use href="#icon-check"/></svg>
+        <span>Your settings have been saved.</span>
+      </div>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="settings-alert settings-alert--error" role="alert">
+        <svg class="icon settings-alert__icon" aria-hidden="true"><use href="#icon-alert"/></svg>
+        <span><%= error %></span>
+      </div>
+    <% } %>
+    <form action="/settings" method="post" class="settings-form">
+      <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+      <section class="settings-section" aria-labelledby="settings-profile-heading">
+        <h2 id="settings-profile-heading" class="settings-section__title">Profile</h2>
+        <p class="settings-section__desc">This name appears in the header when you’re signed in.</p>
+        <div class="form-row">
+          <label for="name">Display name <span class="form-row__optional">(optional)</span></label>
+          <input type="text" id="name" name="name" autocomplete="name" maxlength="200" placeholder="e.g. Alex" value="<%= typeof user !== 'undefined' && user && user.name ? user.name.replace(/"/g, '&quot;') : '' %>">
+        </div>
+        <div class="form-row">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email" required autocomplete="email" maxlength="254" placeholder="you@example.com" value="<%= typeof user !== 'undefined' && user && user.email ? user.email.replace(/"/g, '&quot;') : '' %>">
+          <span class="form-row__hint">Used to sign in. Changing it requires your current password below.</span>
+        </div>
+      </section>
+      <section class="settings-section" aria-labelledby="settings-password-heading">
+        <h2 id="settings-password-heading" class="settings-section__title">Password</h2>
+        <p class="settings-section__desc">Leave new password blank to keep your current one. Required if you change your email above.</p>
+        <div class="form-row">
+          <label for="current_password">Current password</label>
+          <input type="password" id="current_password" name="current_password" autocomplete="current-password" placeholder="••••••••" aria-describedby="current-password-hint">
+          <span id="current-password-hint" class="form-row__hint">Required to change email or set a new password</span>
+        </div>
+        <div class="form-row">
+          <label for="new_password">New password</label>
+          <input type="password" id="new_password" name="new_password" autocomplete="new-password" minlength="8" placeholder="••••••••" aria-describedby="new-password-hint">
+          <span id="new-password-hint" class="form-row__hint">At least 8 characters</span>
+        </div>
+        <div class="form-row">
+          <label for="confirm_password">Confirm new password</label>
+          <input type="password" id="confirm_password" name="confirm_password" autocomplete="new-password" placeholder="••••••••">
+        </div>
+      </section>
+      <section class="settings-section settings-section--export" aria-labelledby="settings-export-heading">
+        <h2 id="settings-export-heading" class="settings-section__title">Export your data</h2>
+        <p class="settings-section__desc">Download a JSON file with your profile and all scan summaries (URLs, scores, metrics, recommendations). Full Lighthouse reports are not included; export those individually from each report page if needed.</p>
+        <a href="/account/export" class="btn btn--ghost settings-export-btn" download>
+          <svg class="icon icon--sm" aria-hidden="true"><use href="#icon-download"/></svg> Download my data
+        </a>
+      </section>
+      <section class="settings-section settings-section--danger" aria-labelledby="settings-delete-heading">
+        <h2 id="settings-delete-heading" class="settings-section__title settings-section__title--danger">Delete account</h2>
+        <p class="settings-section__desc">Permanently delete your account and all your scans. This cannot be undone.</p>
+        <form action="/account/delete" method="post" class="settings-delete-form" id="settings-delete-form">
+          <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+          <div class="form-row">
+            <label for="delete_password">Your password</label>
+            <input type="password" id="delete_password" name="password" autocomplete="current-password" placeholder="••••••••" required>
+          </div>
+          <button type="submit" class="btn btn--danger settings-delete-btn" id="settings-delete-btn">
+            <svg class="icon icon--sm" aria-hidden="true"><use href="#icon-trash"/></svg> Delete my account
+          </button>
+        </form>
+      </section>
+      <div class="settings-form__actions">
+        <button type="submit" class="btn btn--primary settings-form__submit">
+          <svg class="icon icon--sm" aria-hidden="true"><use href="#icon-check"/></svg> Save changes
+        </button>
+        <a href="/dashboard" class="btn btn--ghost">Cancel</a>
+      </div>
+    </form>
+  </div>
+  <script>
+    (function () {
+      var form = document.getElementById('settings-delete-form');
+      if (!form) return;
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!window.showConfirm) { form.submit(); return; }
+        window.showConfirm('Your account and all your scans will be permanently deleted. This cannot be undone.', { title: 'Delete account', okLabel: 'Delete my account', danger: true }).then(function (ok) {
+          if (ok) form.submit();
+        });
+      });
+    })();
+  </script>
+<%- include('partials/footer') %>

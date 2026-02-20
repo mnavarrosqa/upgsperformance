@@ -1,0 +1,84 @@
+<% var scans = typeof scans !== 'undefined' ? scans : []; var first = scans[0]; function isDesktop(s) { return (s.options && s.options.formFactor) === 'desktop'; } var scanIds = scans.map(function(s) { return s.id; }).join(','); %>
+<tr class="dashboard-recent__row" data-scan-ids="<%= scanIds %>">
+  <td class="dashboard-recent__cell dashboard-recent__cell--select" data-label="Select">
+    <label class="bulk-row-select"><input type="checkbox" class="bulk-row-select__input" value="<%= scanIds %>" aria-label="Select this scan"><span class="bulk-row-select__label" aria-hidden="true"></span></label>
+  </td>
+  <td class="dashboard-recent__cell dashboard-recent__cell--url" data-label="URL"><a href="/scans/<%= first.id %>" class="dashboard-recent__link" title="<%= first.url %>"><%= first.url %></a></td>
+  <td class="dashboard-recent__cell dashboard-recent__cell--scores" data-label="Scores">
+    <% if (scans.length === 1 && first.summary && first.summary.categories) { %>
+      <div class="scores-box">
+        <span class="scores-box__title">Scores</span>
+        <div class="scores-box__grid">
+          <% Object.entries(first.summary.categories).forEach(function(entry) {
+            var id = entry[0];
+            var score = entry[1];
+            var label = id.replace(/-/g, ' ');
+            label = label.split(' ').map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+            var iconId = id === 'performance' ? 'icon-check' : id === 'accessibility' ? 'icon-eye' : id === 'best-practices' ? 'icon-bulb' : 'icon-search';
+          %>
+            <span class="score-pill score-pill--<%= id %>" title="<%= label %>"><svg class="icon score-pill__icon" aria-hidden="true"><use href="#<%= iconId %>"/></svg><span class="score-pill__text"><%= label %> <%= score %></span></span>
+          <% }) %>
+        </div>
+      </div>
+    <% } else if (scans.length > 1) { %>
+      <div class="scores-group">
+        <% scans.forEach(function(scan) { %>
+          <% if (scan.summary && scan.summary.categories) { %>
+            <div class="scores-box scores-box--device">
+              <span class="scores-box__device-label scores-box__device-label--<%= isDesktop(scan) ? 'desktop' : 'mobile' %>"><%= isDesktop(scan) ? 'Desktop' : 'Mobile' %></span>
+              <div class="scores-box__grid">
+                <% Object.entries(scan.summary.categories).forEach(function(entry) {
+                  var id = entry[0];
+                  var score = entry[1];
+                  var label = id.replace(/-/g, ' ');
+                  label = label.split(' ').map(function(w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(' ');
+                  var iconId = id === 'performance' ? 'icon-check' : id === 'accessibility' ? 'icon-eye' : id === 'best-practices' ? 'icon-bulb' : 'icon-search';
+                %>
+                  <span class="score-pill score-pill--<%= id %>" title="<%= label %>"><svg class="icon score-pill__icon" aria-hidden="true"><use href="#<%= iconId %>"/></svg><span class="score-pill__text"><%= label %> <%= score %></span></span>
+                <% }) %>
+              </div>
+            </div>
+          <% } %>
+        <% }) %>
+      </div>
+    <% } else { %>—<% } %>
+  </td>
+  <td class="dashboard-recent__cell dashboard-recent__cell--device" data-label="Device">
+    <div class="scan-list__devices">
+      <% scans.forEach(function(scan) { %>
+        <a href="/scans/<%= scan.id %>" class="scan-list__form-factor scan-list__form-factor--link scan-list__form-factor--<%= isDesktop(scan) ? 'desktop' : 'mobile' %>" title="View <%= isDesktop(scan) ? 'Desktop' : 'Mobile' %> report"><%= isDesktop(scan) ? 'Desktop' : 'Mobile' %></a>
+      <% }) %>
+    </div>
+  </td>
+  <td class="dashboard-recent__cell dashboard-recent__cell--date" data-label="Date &amp; time"><%= new Date(first.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></td>
+  <td class="dashboard-recent__cell dashboard-recent__cell--actions" data-label="Actions">
+    <div class="actions-dropdown">
+      <button type="button" class="actions-dropdown__trigger" aria-expanded="false" aria-haspopup="true" aria-label="Actions"><span>Actions</span><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-chevron-down"/></svg></button>
+      <div class="actions-dropdown__menu" role="menu" hidden>
+        <% scans.forEach(function(scan) { %>
+          <a href="/scans/<%= scan.id %>" class="actions-dropdown__item" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-external"/></svg> View report (<%= isDesktop(scan) ? 'Desktop' : 'Mobile' %>)</a>
+        <% }) %>
+        <% var desktopScan = scans.find(function(s) { return (s.options && s.options.formFactor) === 'desktop'; });
+           var mobileScan = scans.find(function(s) { return (s.options && s.options.formFactor) !== 'desktop'; }); %>
+        <button type="button" class="actions-dropdown__item scan-list__rescan" role="menuitem"
+          data-rescan-display-url="<%= first.url %>"
+          <% if (scans.length === 1) { %>data-rescan-url="/scans/<%= first.id %>/rescan" data-rescan-device="<%= isDesktop(first) ? 'Desktop' : 'Mobile' %>"
+          <% } else { %>data-rescan-desktop-url="<%= desktopScan ? '/scans/' + desktopScan.id + '/rescan' : '' %>" data-rescan-mobile-url="<%= mobileScan ? '/scans/' + mobileScan.id + '/rescan' : '' %>" data-rescan-run-id="<%= first.run_id || '' %>" data-rescan-device="Desktop &amp; Mobile"<% } %>><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-run"/></svg> Re-scan</button>
+        <% if (scans.length > 1) { %>
+          <form action="/scans/delete-batch" method="post" class="actions-dropdown__form scan-list__delete-form" role="none">
+            <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+            <input type="hidden" name="redirect" value="dashboard">
+            <% scans.forEach(function(scan) { %><input type="hidden" name="ids" value="<%= scan.id %>"><% }) %>
+            <button type="submit" class="actions-dropdown__item actions-dropdown__item--danger" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-trash"/></svg> Delete</button>
+          </form>
+        <% } else { %>
+          <form action="/scans/<%= first.id %>/delete" method="post" class="actions-dropdown__form scan-list__delete-form" role="none">
+            <% if (typeof csrfToken !== 'undefined' && csrfToken) { %><input type="hidden" name="_csrf" value="<%= csrfToken %>"><% } %>
+            <input type="hidden" name="redirect" value="dashboard">
+            <button type="submit" class="actions-dropdown__item actions-dropdown__item--danger" role="menuitem"><svg class="icon icon--sm" aria-hidden="true"><use href="#icon-trash"/></svg> Delete</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+  </td>
+</tr>

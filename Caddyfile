@@ -1,0 +1,12 @@
+# App URL: https://perf.upgservicios.com
+# TLS with your own certs (mount at /etc/certs: cert.pem, key.pem).
+# Start with: docker compose --profile ssl up -d
+perf.upgservicios.com {
+  tls /etc/certs/cert.pem /etc/certs/key.pem
+  reverse_proxy app:3000
+}
+
+# Redirect HTTP to HTTPS
+:80 {
+  redir https://perf.upgservicios.com{uri} permanent
+}

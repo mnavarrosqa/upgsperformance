@@ -1,0 +1,226 @@
+<div id="filmstrip-overlay" class="filmstrip-overlay" hidden aria-modal="true" aria-label="Page load video">
+  <div class="filmstrip-overlay__backdrop"></div>
+  <div class="filmstrip-overlay__content">
+    <button type="button" class="filmstrip-overlay__close" aria-label="Close"><svg class="icon" aria-hidden="true"><use href="#icon-close"/></svg></button>
+    <div class="filmstrip-overlay__player">
+      <p class="filmstrip-overlay__title">Page load<span class="filmstrip-overlay__chrome" id="filmstrip-overlay-chrome" aria-hidden="true"></span></p>
+      <div class="filmstrip-overlay__viewport">
+        <img class="filmstrip-overlay__frame" src="" alt="Page load progress" hidden>
+      </div>
+      <div class="filmstrip-overlay__progress-wrap" role="group" aria-label="Playback progress">
+        <div class="filmstrip-overlay__progress" tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-label="Seek">
+          <div class="filmstrip-overlay__progress-track"></div>
+          <div class="filmstrip-overlay__progress-fill"></div>
+        </div>
+        <div class="filmstrip-overlay__progress-markers" id="filmstrip-overlay-progress-markers" aria-hidden="true"></div>
+      </div>
+      <div class="filmstrip-overlay__controls">
+        <button type="button" class="filmstrip-overlay__btn filmstrip-overlay__btn--play" aria-label="Play">Play</button>
+        <span class="filmstrip-overlay__time" aria-live="polite">0.0s / 0.0s</span>
+        <label class="filmstrip-overlay__loop">
+          <input type="checkbox" class="filmstrip-overlay__loop-input" aria-label="Loop playback">
+          <span class="filmstrip-overlay__loop-label">Loop</span>
+        </label>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function () {
+  var filmstripOverlay = document.getElementById('filmstrip-overlay');
+  if (!filmstripOverlay) return;
+  var filmstripFrame = filmstripOverlay.querySelector('.filmstrip-overlay__frame');
+  var filmstripPlayBtn = filmstripOverlay.querySelector('.filmstrip-overlay__btn--play');
+  var filmstripTimeEl = filmstripOverlay.querySelector('.filmstrip-overlay__time');
+  var filmstripProgress = filmstripOverlay.querySelector('.filmstrip-overlay__progress');
+  var filmstripProgressFill = filmstripOverlay.querySelector('.filmstrip-overlay__progress-fill');
+  var filmstripLoopInput = filmstripOverlay.querySelector('.filmstrip-overlay__loop-input');
+  var filmstripBackdrop = filmstripOverlay.querySelector('.filmstrip-overlay__backdrop');
+  var filmstripClose = filmstripOverlay.querySelector('.filmstrip-overlay__close');
+  var overlayFrames = [];
+  var overlayIndex = 0;
+  var overlayPlaying = false;
+  var overlayStartTime = 0;
+  var overlayRafId = null;
+  function overlayTotalMs() { return overlayFrames.length ? overlayFrames[overlayFrames.length - 1].timing : 0; }
+  function overlayUpdateProgress() {
+    var total = overlayTotalMs();
+    var current = overlayFrames.length ? overlayFrames[overlayIndex].timing : 0;
+    var pct = total > 0 ? (current / total) * 100 : 0;
+    if (filmstripTimeEl) filmstripTimeEl.textContent = (current / 1000).toFixed(1) + 's / ' + (total / 1000).toFixed(1) + 's';
+    if (filmstripProgressFill) filmstripProgressFill.style.width = pct + '%';
+    if (filmstripProgress) {
+      filmstripProgress.setAttribute('aria-valuenow', Math.round(current));
+      filmstripProgress.setAttribute('aria-valuemax', total);
+    }
+  }
+  function showOverlayFrame(index) {
+    if (index < 0 || index >= overlayFrames.length) return;
+    overlayIndex = index;
+    var f = overlayFrames[index];
+    filmstripFrame.src = f.data;
+    filmstripFrame.removeAttribute('hidden');
+    filmstripPlayBtn.textContent = overlayPlaying ? 'Pause' : 'Play';
+    filmstripPlayBtn.setAttribute('aria-label', overlayPlaying ? 'Pause' : 'Play');
+    overlayUpdateProgress();
+  }
+  function overlayTick() {
+    if (!overlayPlaying || overlayFrames.length === 0) return;
+    var elapsed = Date.now() - overlayStartTime;
+    var nextIndex = 0;
+    for (var i = overlayFrames.length - 1; i >= 0; i--) {
+      if (overlayFrames[i].timing <= elapsed) { nextIndex = i; break; }
+    }
+    showOverlayFrame(nextIndex);
+    if (nextIndex >= overlayFrames.length - 1) {
+      if (filmstripLoopInput && filmstripLoopInput.checked) {
+        overlayIndex = 0;
+        overlayStartTime = Date.now();
+        showOverlayFrame(0);
+        overlayRafId = requestAnimationFrame(overlayTick);
+      } else {
+        overlayPlaying = false;
+        filmstripPlayBtn.textContent = 'Play';
+        filmstripPlayBtn.setAttribute('aria-label', 'Play');
+        return;
+      }
+    } else {
+      overlayRafId = requestAnimationFrame(overlayTick);
+    }
+  }
+  function overlayPlay() {
+    if (overlayFrames.length === 0) return;
+    overlayPlaying = true;
+    overlayStartTime = Date.now() - (overlayIndex > 0 ? overlayFrames[overlayIndex].timing : 0);
+    filmstripPlayBtn.textContent = 'Pause';
+    filmstripPlayBtn.setAttribute('aria-label', 'Pause');
+    overlayTick();
+  }
+  function overlayPause() {
+    overlayPlaying = false;
+    if (overlayRafId) cancelAnimationFrame(overlayRafId);
+    overlayRafId = null;
+    filmstripPlayBtn.textContent = 'Play';
+    filmstripPlayBtn.setAttribute('aria-label', 'Play');
+  }
+  function overlaySeekTo(ms) {
+    var total = overlayTotalMs();
+    if (total <= 0) return;
+    var idx = 0;
+    for (var i = 0; i < overlayFrames.length; i++) {
+      if (overlayFrames[i].timing <= ms) idx = i;
+    }
+    if (overlayPlaying) overlayStartTime = Date.now() - overlayFrames[idx].timing;
+    showOverlayFrame(idx);
+  }
+  var filmstripViewportEl = filmstripOverlay.querySelector('.filmstrip-overlay__viewport');
+  var FILMSTRIP_FALLBACK_SIZE = { desktop: { width: 1440, height: 900 }, mobile: { width: 390, height: 844 } };
+  function sizeOverlayFromImage() {
+    if (!filmstripViewportEl || !filmstripFrame.naturalWidth || !filmstripFrame.naturalHeight) return;
+    var w = filmstripFrame.naturalWidth;
+    var h = filmstripFrame.naturalHeight;
+    var maxW = window.innerWidth * 0.9;
+    var maxH = window.innerHeight * 0.85;
+    var scale = Math.min(1, maxW / w, maxH / h);
+    filmstripViewportEl.style.width = Math.round(w * scale) + 'px';
+    filmstripViewportEl.style.height = Math.round(h * scale) + 'px';
+  }
+  var filmstripChromeEl = filmstripOverlay.querySelector('#filmstrip-overlay-chrome');
+  var filmstripMarkersEl = document.getElementById('filmstrip-overlay-progress-markers');
+  function renderOverlayMarkers(metrics, totalMs) {
+    if (!filmstripMarkersEl || !metrics || !metrics.length || !totalMs || totalMs <= 0) return;
+    filmstripMarkersEl.innerHTML = '';
+    metrics.forEach(function (m) {
+      var value = typeof m.value === 'number' ? m.value : 0;
+      var pct = Math.min(99, Math.max(1, (value / totalMs) * 100));
+      var span = document.createElement('span');
+      span.className = 'filmstrip-overlay__progress-marker filmstrip-overlay__progress-marker--' + (m.id || '');
+      span.style.left = pct + '%';
+      span.setAttribute('title', (m.label || '') + ' ' + (m.displayValue || ''));
+      var line = document.createElement('span');
+      line.className = 'filmstrip-overlay__progress-marker-line';
+      var label = document.createElement('span');
+      label.className = 'filmstrip-overlay__progress-marker-label';
+      label.textContent = m.label || '';
+      span.appendChild(line);
+      span.appendChild(label);
+      filmstripMarkersEl.appendChild(span);
+    });
+  }
+  window.openFilmstripOverlay = function (frames, formFactor, chromeVersion, metrics) {
+    if (!frames || !frames.length || !filmstripFrame || !filmstripPlayBtn) return;
+    formFactor = formFactor === 'desktop' ? 'desktop' : 'mobile';
+    if (filmstripChromeEl) {
+      filmstripChromeEl.textContent = chromeVersion ? ' — Chrome ' + chromeVersion : '';
+      filmstripChromeEl.setAttribute('aria-hidden', chromeVersion ? 'false' : 'true');
+    }
+    overlayFrames = frames;
+    var totalMs = overlayFrames.length ? overlayFrames[overlayFrames.length - 1].timing : 0;
+    renderOverlayMarkers(metrics || [], totalMs);
+    overlayIndex = 0;
+    overlayPlaying = false;
+    if (overlayRafId) cancelAnimationFrame(overlayRafId);
+    overlayRafId = null;
+    if (filmstripViewportEl) {
+      var fallback = FILMSTRIP_FALLBACK_SIZE[formFactor];
+      var maxW = window.innerWidth * 0.9;
+      var maxH = window.innerHeight * 0.85;
+      var scale = Math.min(1, maxW / fallback.width, maxH / fallback.height);
+      filmstripViewportEl.style.width = Math.round(fallback.width * scale) + 'px';
+      filmstripViewportEl.style.height = Math.round(fallback.height * scale) + 'px';
+    }
+    showOverlayFrame(0);
+    if (filmstripFrame.complete && filmstripFrame.naturalWidth) {
+      sizeOverlayFromImage();
+    } else {
+      filmstripFrame.onload = function () {
+        filmstripFrame.onload = null;
+        sizeOverlayFromImage();
+      };
+    }
+    overlayUpdateProgress();
+    filmstripOverlay.removeAttribute('hidden');
+    document.body.style.overflow = 'hidden';
+  };
+  function closeFilmstripOverlay() {
+    overlayPause();
+    filmstripOverlay.setAttribute('hidden', '');
+    document.body.style.overflow = '';
+  }
+  if (filmstripPlayBtn) filmstripPlayBtn.addEventListener('click', function () {
+    if (overlayPlaying) overlayPause(); else overlayPlay();
+  });
+  if (filmstripProgress) {
+    filmstripProgress.addEventListener('click', function (e) {
+      if (overlayFrames.length === 0) return;
+      var rect = filmstripProgress.getBoundingClientRect();
+      var total = overlayTotalMs();
+      var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      overlaySeekTo(pct * total);
+    });
+    filmstripProgress.addEventListener('keydown', function (e) {
+      if (overlayFrames.length === 0) return;
+      var total = overlayTotalMs();
+      var step = total / 20;
+      if (e.key === 'ArrowLeft' || e.key === 'Home') {
+        e.preventDefault();
+        overlaySeekTo(e.key === 'Home' ? 0 : Math.max(0, overlayFrames[overlayIndex].timing - step));
+      } else if (e.key === 'ArrowRight' || e.key === 'End') {
+        e.preventDefault();
+        overlaySeekTo(e.key === 'End' ? total : Math.min(total, overlayFrames[overlayIndex].timing + step));
+      }
+    });
+  }
+  if (filmstripBackdrop) filmstripBackdrop.addEventListener('click', closeFilmstripOverlay);
+  if (filmstripClose) filmstripClose.addEventListener('click', closeFilmstripOverlay);
+  document.addEventListener('keydown', function (e) {
+    if (filmstripOverlay && !filmstripOverlay.hasAttribute('hidden')) {
+      if (e.key === 'Escape') closeFilmstripOverlay();
+      if (e.key === ' ' && document.activeElement && document.activeElement.closest('.filmstrip-overlay__player')) {
+        e.preventDefault();
+        if (overlayPlaying) overlayPause(); else overlayPlay();
+      }
+    }
+  });
+})();
+</script>
