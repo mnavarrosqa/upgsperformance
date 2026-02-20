@@ -166,9 +166,18 @@
           dropdown.setAttribute('data-open', 'true');
           trigger.setAttribute('aria-expanded', 'true');
           menu.removeAttribute('hidden');
+          requestAnimationFrame(function () {
+            var rect = menu.getBoundingClientRect();
+            if (rect.bottom > window.innerHeight) {
+              dropdown.classList.add('actions-dropdown--open-up');
+            } else {
+              dropdown.classList.remove('actions-dropdown--open-up');
+            }
+          });
         }
         function close() {
           dropdown.removeAttribute('data-open');
+          dropdown.classList.remove('actions-dropdown--open-up');
           trigger.setAttribute('aria-expanded', 'false');
           menu.setAttribute('hidden', '');
         }
@@ -179,6 +188,7 @@
             document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
               if (d !== dropdown) {
                 d.removeAttribute('data-open');
+                d.classList.remove('actions-dropdown--open-up');
                 d.querySelector('.actions-dropdown__trigger').setAttribute('aria-expanded', 'false');
                 d.querySelector('.actions-dropdown__menu').setAttribute('hidden', '');
               }

@@ -419,6 +419,7 @@
             document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
               if (d !== dropdown) {
                 d.removeAttribute('data-open');
+                d.classList.remove('actions-dropdown--open-up');
                 var t = d.querySelector('.actions-dropdown__trigger');
                 var m = d.querySelector('.actions-dropdown__menu');
                 if (t) t.setAttribute('aria-expanded', 'false');
@@ -427,18 +428,28 @@
             });
             if (isOpen) {
               dropdown.removeAttribute('data-open');
+              dropdown.classList.remove('actions-dropdown--open-up');
               trigger.setAttribute('aria-expanded', 'false');
               menu.setAttribute('hidden', '');
             } else {
               dropdown.setAttribute('data-open', 'true');
               trigger.setAttribute('aria-expanded', 'true');
               menu.removeAttribute('hidden');
+              requestAnimationFrame(function () {
+                var rect = menu.getBoundingClientRect();
+                if (rect.bottom > window.innerHeight) {
+                  dropdown.classList.add('actions-dropdown--open-up');
+                } else {
+                  dropdown.classList.remove('actions-dropdown--open-up');
+                }
+              });
             }
           }
           if (e.target.closest && e.target.closest('.actions-dropdown__item, .actions-dropdown__form button')) {
             var d = e.target.closest('.actions-dropdown');
             if (d) {
               d.removeAttribute('data-open');
+              d.classList.remove('actions-dropdown--open-up');
               var t = d.querySelector('.actions-dropdown__trigger');
               var m = d.querySelector('.actions-dropdown__menu');
               if (t) t.setAttribute('aria-expanded', 'false');
@@ -451,6 +462,7 @@
         if (e.target.closest && e.target.closest('.actions-dropdown')) return;
         document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
           d.removeAttribute('data-open');
+          d.classList.remove('actions-dropdown--open-up');
           var t = d.querySelector('.actions-dropdown__trigger');
           var m = d.querySelector('.actions-dropdown__menu');
           if (t) t.setAttribute('aria-expanded', 'false');

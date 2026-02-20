@@ -2856,6 +2856,14 @@ body {
   z-index: 10;
 }
 
+/* Flip menu above trigger when near bottom of viewport to avoid scrollbars */
+.actions-dropdown.actions-dropdown--open-up .actions-dropdown__menu {
+  top: auto;
+  bottom: 100%;
+  margin-top: 0;
+  margin-bottom: var(--space-sm);
+}
+
 .actions-dropdown__menu[hidden] {
   display: none;
 }
