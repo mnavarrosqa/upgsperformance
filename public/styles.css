@@ -2856,12 +2856,12 @@ body {
   z-index: 10;
 }
 
-/* Flip menu above trigger when near bottom of viewport to avoid scrollbars */
-.actions-dropdown.actions-dropdown--open-up .actions-dropdown__menu {
-  top: auto;
-  bottom: 100%;
+/* When open, menu is positioned fixed in viewport to avoid parent overflow/scrollbars */
+.actions-dropdown__menu.actions-dropdown__menu--positioned {
+  position: fixed;
+  z-index: 1000;
   margin-top: 0;
-  margin-bottom: var(--space-sm);
+  margin-bottom: 0;
 }
 
 .actions-dropdown__menu[hidden] {

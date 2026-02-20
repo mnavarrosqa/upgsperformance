@@ -419,29 +419,45 @@
             document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
               if (d !== dropdown) {
                 d.removeAttribute('data-open');
-                d.classList.remove('actions-dropdown--open-up');
                 var t = d.querySelector('.actions-dropdown__trigger');
                 var m = d.querySelector('.actions-dropdown__menu');
                 if (t) t.setAttribute('aria-expanded', 'false');
-                if (m) m.setAttribute('hidden', '');
+                if (m) {
+                  m.setAttribute('hidden', '');
+                  m.classList.remove('actions-dropdown__menu--positioned');
+                  m.style.top = m.style.right = m.style.left = m.style.bottom = '';
+                }
               }
             });
             if (isOpen) {
               dropdown.removeAttribute('data-open');
-              dropdown.classList.remove('actions-dropdown--open-up');
               trigger.setAttribute('aria-expanded', 'false');
               menu.setAttribute('hidden', '');
+              menu.classList.remove('actions-dropdown__menu--positioned');
+              menu.style.top = menu.style.right = menu.style.left = menu.style.bottom = '';
             } else {
               dropdown.setAttribute('data-open', 'true');
               trigger.setAttribute('aria-expanded', 'true');
               menu.removeAttribute('hidden');
               requestAnimationFrame(function () {
-                var rect = menu.getBoundingClientRect();
-                if (rect.bottom > window.innerHeight) {
-                  dropdown.classList.add('actions-dropdown--open-up');
+                var triggerRect = trigger.getBoundingClientRect();
+                var menuHeight = menu.offsetHeight;
+                var menuWidth = menu.offsetWidth;
+                var gap = 8;
+                var spaceBelow = window.innerHeight - triggerRect.bottom;
+                var openAbove = spaceBelow < menuHeight && triggerRect.top >= spaceBelow;
+                menu.classList.add('actions-dropdown__menu--positioned');
+                menu.style.bottom = 'auto';
+                var rightPx = window.innerWidth - triggerRect.right;
+                var leftEdge = window.innerWidth - rightPx - menuWidth;
+                if (leftEdge < gap) {
+                  menu.style.left = gap + 'px';
+                  menu.style.right = 'auto';
                 } else {
-                  dropdown.classList.remove('actions-dropdown--open-up');
+                  menu.style.left = 'auto';
+                  menu.style.right = rightPx + 'px';
                 }
+                menu.style.top = openAbove ? (triggerRect.top - menuHeight - gap) + 'px' : (triggerRect.bottom + gap) + 'px';
               });
             }
           }
@@ -449,11 +465,14 @@
             var d = e.target.closest('.actions-dropdown');
             if (d) {
               d.removeAttribute('data-open');
-              d.classList.remove('actions-dropdown--open-up');
               var t = d.querySelector('.actions-dropdown__trigger');
               var m = d.querySelector('.actions-dropdown__menu');
               if (t) t.setAttribute('aria-expanded', 'false');
-              if (m) m.setAttribute('hidden', '');
+              if (m) {
+                m.setAttribute('hidden', '');
+                m.classList.remove('actions-dropdown__menu--positioned');
+                m.style.top = m.style.right = m.style.left = m.style.bottom = '';
+              }
             }
           }
         });
@@ -462,11 +481,14 @@
         if (e.target.closest && e.target.closest('.actions-dropdown')) return;
         document.querySelectorAll('.actions-dropdown[data-open="true"]').forEach(function (d) {
           d.removeAttribute('data-open');
-          d.classList.remove('actions-dropdown--open-up');
           var t = d.querySelector('.actions-dropdown__trigger');
           var m = d.querySelector('.actions-dropdown__menu');
           if (t) t.setAttribute('aria-expanded', 'false');
-          if (m) m.setAttribute('hidden', '');
+          if (m) {
+            m.setAttribute('hidden', '');
+            m.classList.remove('actions-dropdown__menu--positioned');
+            m.style.top = m.style.right = m.style.left = m.style.bottom = '';
+          }
         });
       });
     })();
