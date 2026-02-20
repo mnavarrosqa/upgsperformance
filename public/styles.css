@@ -4026,9 +4026,6 @@ a.actions-dropdown__item {
   inset: 0;
   z-index: 100;
   overflow: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: var(--space-lg);
   box-sizing: border-box;
 }
@@ -4051,8 +4048,9 @@ a.actions-dropdown__item {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: min-content;
+  min-height: 100%;
   padding: var(--space-lg);
+  box-sizing: border-box;
 }
 
 .screenshot-overlay__img {

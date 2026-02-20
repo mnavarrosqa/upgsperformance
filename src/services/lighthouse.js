@@ -25,6 +25,8 @@ function median(values) {
 
 /**
  * Take full-page WebP screenshot using the same Chrome instance (by port).
+ * Uses deviceScaleFactor 1 for mobile to avoid Chromium/Puppeteer bugs with
+ * fullPage + deviceScaleFactor 2 (clipping, duplication, or capture failure).
  * @param {number} port - Chrome remote debugging port
  * @param {string} url - Page URL
  * @param {'desktop'|'mobile'} formFactor
@@ -38,10 +40,11 @@ async function takeScreenshotInBrowser(port, url, formFactor) {
       browserURL: `http://127.0.0.1:${port}`,
     });
     const page = await browser.newPage();
+    const screenshotScale = formFactor === 'mobile' ? 1 : vp.deviceScaleFactor;
     await page.setViewport({
       width: vp.width,
       height: vp.height,
-      deviceScaleFactor: vp.deviceScaleFactor,
+      deviceScaleFactor: screenshotScale,
     });
     await page.goto(url, {
       waitUntil: 'load',
@@ -57,7 +60,7 @@ async function takeScreenshotInBrowser(port, url, formFactor) {
     return { buffer: Buffer.from(buffer), ext: 'webp' };
   } catch (err) {
     if (browser) await browser.disconnect().catch(() => {});
-    console.error('Screenshot in Lighthouse session failed:', err.message);
+    console.error('Screenshot in Lighthouse session failed (%s):', formFactor, err.message);
     return null;
   }
 }
