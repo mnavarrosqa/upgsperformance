@@ -12,6 +12,17 @@ const VIEWPORTS = {
 const WEBP_QUALITY = 85;
 const PAGE_LOAD_TIMEOUT_MS = 30000;
 
+/** Number of Lighthouse runs to perform; median summary is used for stable scores (aligns with PageSpeed methodology). */
+const MEDIAN_RUNS = 3;
+
+function median(values) {
+  if (!Array.isArray(values) || values.length === 0) return null;
+  const sorted = [...values].filter((v) => v != null && !Number.isNaN(v)).sort((a, b) => a - b);
+  if (sorted.length === 0) return null;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 /**
  * Take full-page WebP screenshot using the same Chrome instance (by port).
  * @param {number} port - Chrome remote debugging port
@@ -52,13 +63,12 @@ async function takeScreenshotInBrowser(port, url, formFactor) {
 }
 
 /**
- * Run Lighthouse on a URL and return full report, summary, and full-page screenshot.
- * Screenshot is taken in the same Chrome session as Lighthouse (one launch for both + filmstrip).
+ * Run a single Lighthouse pass (launch Chrome, run audit, screenshot, kill).
  * @param {string} url - Valid http(s) URL
  * @param {{ formFactor?: 'mobile'|'desktop', categories?: string[] }} options
  * @returns {{ report: object, summary: object, screenshot: { buffer: Buffer, ext: 'webp' } | null }}
  */
-export async function runLighthouse(url, options = {}) {
+async function runOneLighthouseRun(url, options) {
   const launchOpts = { chromeFlags: config.chromeFlags };
   if (config.chromePath) {
     launchOpts.chromePath = config.chromePath;
@@ -100,7 +110,6 @@ export async function runLighthouse(url, options = {}) {
     const result = await lighthouse(url, lighthouseOptions, lighthouseConfig);
     const lhr = result.lhr;
     const summary = extractSummary(lhr);
-    // Full-page screenshot of the final URL (after redirects) so it matches the audited page
     const screenshotUrl = lhr.finalUrl || url;
     const screenshot = await takeScreenshotInBrowser(chrome.port, screenshotUrl, formFactor);
     await chrome.kill();
@@ -113,6 +122,91 @@ export async function runLighthouse(url, options = {}) {
         : lighthouseErr.message;
     throw new Error(`Lighthouse run failed: ${msg}`);
   }
+}
+
+/**
+ * Build a summary from median category scores and median metric values across runs.
+ * Recommendations and metadata (finalUrl, chromeVersion) come from the run whose performance score is closest to the median.
+ */
+function mergeMedianSummary(runs) {
+  if (!Array.isArray(runs) || runs.length === 0) return null;
+  const first = runs[0].summary;
+  if (!first) return null;
+
+  const categories = {};
+  for (const id of Object.keys(first.categories || {})) {
+    const values = runs.map((r) => r.summary.categories && r.summary.categories[id]).filter((v) => v != null);
+    const m = median(values);
+    if (m != null) categories[id] = Math.round(m);
+  }
+
+  const metrics = {};
+  const metricIds = [
+    'first-contentful-paint',
+    'largest-contentful-paint',
+    'total-blocking-time',
+    'cumulative-layout-shift',
+    'speed-index',
+    'interactive',
+  ];
+  for (const id of metricIds) {
+    const values = runs.map((r) => r.summary.metrics && r.summary.metrics[id] && r.summary.metrics[id].value).filter((v) => v != null);
+    const m = median(values);
+    if (m != null) {
+      const runWithMedian = runs.find((r) => r.summary.metrics && r.summary.metrics[id]);
+      const displayValue = runWithMedian && runWithMedian.summary.metrics[id].displayValue;
+      metrics[id] = { value: m, displayValue: displayValue || String(m) };
+    }
+  }
+
+  const perfScores = runs.map((r) => (r.summary.categories && r.summary.categories.performance) ?? null).filter((v) => v != null);
+  const medianPerf = median(perfScores);
+  const bestRun = medianPerf == null
+    ? runs[0]
+    : runs.reduce((best, r) => {
+        const score = (r.summary.categories && r.summary.categories.performance) ?? 0;
+        const bestScore = (best.summary.categories && best.summary.categories.performance) ?? 0;
+        return Math.abs(score - medianPerf) < Math.abs(bestScore - medianPerf) ? r : best;
+      });
+
+  return {
+    categories,
+    metrics,
+    recommendations: (bestRun.summary.recommendations || []).slice(),
+    finalUrl: bestRun.summary.finalUrl || first.finalUrl,
+    chromeVersion: bestRun.summary.chromeVersion || first.chromeVersion,
+  };
+}
+
+/**
+ * Run Lighthouse on a URL and return full report, summary, and full-page screenshot.
+ * Runs Lighthouse MEDIAN_RUNS times and uses the median of category scores and metrics for the summary (aligns with PageSpeed Insights methodology).
+ * The stored report and screenshot are from the run whose performance score is closest to the median.
+ * @param {string} url - Valid http(s) URL
+ * @param {{ formFactor?: 'mobile'|'desktop', categories?: string[] }} options
+ * @returns {{ report: object, summary: object, screenshot: { buffer: Buffer, ext: 'webp' } | null }}
+ */
+export async function runLighthouse(url, options = {}) {
+  const runs = [];
+  for (let i = 0; i < MEDIAN_RUNS; i++) {
+    const result = await runOneLighthouseRun(url, options);
+    runs.push(result);
+  }
+  const medianSummary = mergeMedianSummary(runs);
+  const perfScores = runs.map((r) => (r.summary.categories && r.summary.categories.performance) ?? null).filter((v) => v != null);
+  const medianPerf = median(perfScores);
+  const bestRun = medianPerf == null
+    ? runs[0]
+    : runs.reduce((best, r) => {
+        const score = (r.summary.categories && r.summary.categories.performance) ?? 0;
+        const bestScore = (best.summary.categories && best.summary.categories.performance) ?? 0;
+        return Math.abs(score - medianPerf) < Math.abs(bestScore - medianPerf) ? r : best;
+      });
+  return {
+    report: bestRun.report,
+    summary: medianSummary,
+    screenshot: bestRun.screenshot,
+  };
 }
 
 /**

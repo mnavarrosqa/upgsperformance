@@ -2,6 +2,8 @@
 
 Performance and insight scan tool using Google Lighthouse. Stores results in SQLite and provides user registration and login.
 
+Scores are computed from the **median of 3 Lighthouse runs** (same methodology as PageSpeed Insights) to reduce variance. The app runs in Docker with **2 GB shared memory** for Chromium to keep Lighthouse stable and performant.
+
 ## Requirements
 
 - **Node.js 22+** (Lighthouse requires Node 22 or later)
@@ -122,7 +124,7 @@ Open http://localhost:3000 (or your `PORT`). The home page is a landing page whe
 
 ## Running with Docker
 
-The app can run in a container with Node 22 and Chromium included. You need **Docker** and **Docker Compose** installed.
+The app runs in a container with Node 22 and Chromium. The Compose file sets **`shm_size: 2g`** so Chromium has enough shared memory for Lighthouse (avoids slowdowns or instability in the container). You need **Docker** and **Docker Compose** installed.
 
 Host ports are **non-default** (app: **3001**, Caddy: **8080** / **8443**) so they do not conflict with nginx (80/443) or MySQL (3306) on the same server.
 
@@ -144,6 +146,16 @@ Host ports are **non-default** (app: **3001**, Caddy: **8080** / **8443**) so th
 
 To stop: `docker compose down`.
 
+### After deploying (rebuild and next steps)
+
+After changing the app or Compose config (e.g. `shm_size`, median runs), rebuild and restart:
+
+```bash
+docker compose build app && docker compose up -d app
+```
+
+Then run a **desktop** scan on the same URL you use in PageSpeed Insights and compare scores and metrics (LCP, TBT, FCP). If a large gap remains, consider running the app in a region close to the site or its CDN.
+
 ### Using a .env file
 
 If you prefer to keep the session secret in a file:
@@ -154,13 +166,28 @@ If you prefer to keep the session secret in a file:
 
 ### Docker without Compose
 
-Build and run the image yourself (host port 3001 to avoid conflict with nginx/MySQL):
+**1. Build the image** (required once; run from the project directory):
 
 ```bash
+cd /path/to/upgsperformance
 docker build -t upgs-perf .
-docker run -d -p 3001:3000 \
+```
+
+**2. Prepare the data directory** (if using a bind mount). The container runs as user `node` (UID 1000) and must be able to write to `/app/data`. Use format `host_path:/app/data`:
+
+```bash
+mkdir -p /path/on/host   # e.g. /home/user/docker/app
+sudo chown 1000:1000 /path/on/host
+```
+
+(To check the container user: `docker run --rm upgs-perf id`.)
+
+**3. Run the container** (host port 3001 to avoid conflict with nginx/MySQL):
+
+```bash
+docker run -d --restart unless-stopped -p 3001:3000 \
   -e SESSION_SECRET=$(openssl rand -hex 32) \
-  -v upgs-data:/app/data \
+  -v /path/on/host:/app/data \
   --name upgs-perf \
   upgs-perf
 ```
@@ -169,7 +196,8 @@ Use the same session secret each time you recreate the container if you want exi
 
 ### What gets stored
 
-- Database, sessions, screenshots, and filmstrips are stored in the **`upgs-data`** volume. They persist when you stop or recreate the container.
+- Database, sessions, screenshots, and filmstrips are stored in the **`upgs-data`** volume (Compose) or in the directory you mount at **`/app/data`** (bind mount). They persist when you stop or recreate the container.
+- **Bind mount:** if you use `-v /path/on/host:/app/data`, create the host directory first and make it writable by the container user: `sudo chown 1000:1000 /path/on/host`. The app runs as user `node` (UID 1000). To confirm: `docker run --rm upgs-perf id`.
 
 ### Docker with HTTPS (SSL)
 
@@ -205,6 +233,34 @@ The app is served at **https://perf.upgservicios.com**. A Caddy reverse proxy in
 ### HTTP only (no HTTPS)
 
 If you access the app over HTTP (e.g. `http://yourserver:3001`), set `COOKIE_SECURE=0` so session cookies work. In `docker-compose.yml` you can add under `environment`: `- COOKIE_SECURE=0`, or pass it when running `docker run`.
+
+### Reverse proxy with Apache (e.g. perf.upgservicios.com)
+
+If the app runs in Docker on a server that already has **Apache** (e.g. Ubuntu), you can serve it at **https://perf.upgservicios.com** with Apache as reverse proxy.
+
+1. **DNS:** In your DNS (e.g. Cloudflare), add an **A** record: name `perf`, value = IP of the server.
+
+2. **Enable proxy modules:**
+   ```bash
+   sudo a2enmod proxy proxy_http headers ssl
+   ```
+
+3. **Create the site** (e.g. `/etc/apache2/sites-available/perf.upgservicios.com.conf`):
+   - A `<VirtualHost *:80>` with `ServerName perf.upgservicios.com` and `ProxyPass / http://127.0.0.1:3001/`, `ProxyPassReverse / http://127.0.0.1:3001/`, `ProxyPreserveHost On`.
+   - Enable it: `sudo a2ensite perf.upgservicios.com.conf`, then get the certificate (step 4).
+
+4. **SSL with Let’s Encrypt:**
+   ```bash
+   sudo certbot --apache -d perf.upgservicios.com
+   ```
+   Certbot will create or update the HTTPS vhost. Then edit the generated SSL vhost (e.g. `perf.upgservicios.com-le-ssl.conf`) so it uses the same `ProxyPass` / `ProxyPassReverse` to `http://127.0.0.1:3001/` and add `RequestHeader set X-Forwarded-Proto "https"`. Reload Apache: `sudo systemctl reload apache2`.
+
+5. Ensure the Docker app is running and listening on port 3001 on the host (e.g. `docker run ... -p 3001:3000 ...`).
+
+### Docker: troubleshooting
+
+- **`SQLITE_CANTOPEN: unable to open database file`** — The app cannot write to `/app/data`. Check: (1) Volume format is `host_path:/app/data` (two paths). (2) The host directory exists and is writable by the container user: `sudo chown 1000:1000 /path/on/host` (confirm UID with `docker run --rm upgs-perf id`). Then `docker restart upgs-perf`.
+- **`Unable to find image 'upgs-perf:latest'`** — Build the image first from the project directory: `docker build -t upgs-perf .`.
 
 ### Landing page screenshots
 
@@ -281,24 +337,24 @@ Replace `YOUR_USER` and paths with your values. Use `EnvironmentFile=` only if y
 
 ### Option 3: Docker with restart
 
-Run the container with a restart policy so it stays up and restarts after a reboot:
+Run the container with a restart policy so it stays up and restarts after a reboot. Create the data directory and set permissions first (see [Docker without Compose](#docker-without-compose)):
 
 ```bash
-docker run -d --restart unless-stopped -p 3001:3000 -e SESSION_SECRET=your-secret -v /path/to/data:/app/data upgs-perf
+mkdir -p /path/to/data && sudo chown 1000:1000 /path/to/data
+docker run -d --restart unless-stopped -p 3001:3000 -e SESSION_SECRET=your-secret -v /path/to/data:/app/data --name upgs-perf upgs-perf
 ```
 
 `--restart unless-stopped` restarts the container on failure and after host reboot.
 
 ## Remote / Docker
 
-The app runs remotely; no local-only assumptions. For Docker, use the included Dockerfile (installs Chromium). Build and run:
+The app runs remotely; no local-only assumptions. For Docker, use the included Dockerfile (installs Chromium). Build the image, then run with a volume so the DB and files persist (see [Docker without Compose](#docker-without-compose) for data directory permissions):
 
 ```bash
 docker build -t upgs-perf .
-docker run -p 3001:3000 -e SESSION_SECRET=your-secret upgs-perf
+mkdir -p /path/to/data && sudo chown 1000:1000 /path/to/data
+docker run -d -p 3001:3000 -e SESSION_SECRET=your-secret -v /path/to/data:/app/data --name upgs-perf upgs-perf
 ```
-
-Persist the SQLite DB by mounting a volume for `/app/data`.
 
 ## Environment
 
